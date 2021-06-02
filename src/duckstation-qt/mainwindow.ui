@@ -6,9 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>754</width>
+    <width>798</width>
     <height>600</height>
    </rect>
+  </property>
+  <property name="acceptDrops">
+   <bool>true</bool>
   </property>
   <property name="windowTitle">
    <string>DuckStation</string>
@@ -16,9 +19,6 @@
   <property name="windowIcon">
    <iconset resource="resources/resources.qrc">
     <normaloff>:/icons/duck.png</normaloff>:/icons/duck.png</iconset>
-  </property>
-  <property name="acceptDrops">
-    <bool>true</bool>
   </property>
   <widget class="QStackedWidget" name="mainContainer">
    <property name="currentIndex">
@@ -32,8 +32,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>754</width>
-     <height>21</height>
+     <width>798</width>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuSystem">
@@ -48,10 +48,10 @@
       <iconset resource="resources/resources.qrc">
        <normaloff>:/icons/media-optical.png</normaloff>:/icons/media-optical.png</iconset>
      </property>
+     <actiongroup name="actionGroupChangeDiscSubImages"/>
      <addaction name="actionChangeDiscFromFile"/>
      <addaction name="actionChangeDiscFromGameList"/>
      <addaction name="actionRemoveDisc"/>
-     <actiongroup name="actionGroupChangeDiscSubImages" />
      <addaction name="separator"/>
     </widget>
     <widget class="QMenu" name="menuCheats">
@@ -112,6 +112,20 @@
      <property name="title">
       <string>Language</string>
      </property>
+     <addaction name="actionEnglish"/>
+     <addaction name="actionDeutsch"/>
+     <addaction name="actionEspa_ol"/>
+     <addaction name="actionFran_ais"/>
+     <addaction name="action"/>
+     <addaction name="action_2"/>
+     <addaction name="actionItalian"/>
+     <addaction name="actionNederlands"/>
+     <addaction name="actionPolski"/>
+     <addaction name="actionPortuguese_Pt"/>
+     <addaction name="actionPortuguese_Br"/>
+     <addaction name="actionP"/>
+     <addaction name="actionTurkish"/>
+     <addaction name="action_3"/>
     </widget>
     <addaction name="separator"/>
     <addaction name="actionGeneralSettings"/>
@@ -447,62 +461,56 @@
    </property>
   </action>
   <action name="actionGitHubRepository">
-    <property name="icon">
-      <iconset resource="resources/resources.qrc">
-        <normaloff>:/icons/github.png</normaloff>:/icons/github.png
-      </iconset>
-    </property>
-    <property name="text">
+   <property name="icon">
+    <iconset resource="resources/resources.qrc">
+     <normaloff>:/icons/github.png</normaloff>:/icons/github.png</iconset>
+   </property>
+   <property name="text">
     <string>&amp;GitHub Repository...</string>
    </property>
   </action>
   <action name="actionIssueTracker">
-    <property name="icon">
-      <iconset resource="resources/resources.qrc">
-        <normaloff>:/icons/IssueTracker.png</normaloff>:/icons/IssueTracker.png
-      </iconset>
-    </property>
-    <property name="text">
+   <property name="icon">
+    <iconset resource="resources/resources.qrc">
+     <normaloff>:/icons/IssueTracker.png</normaloff>:/icons/IssueTracker.png</iconset>
+   </property>
+   <property name="text">
     <string>&amp;Issue Tracker...</string>
    </property>
   </action>
   <action name="actionDiscordServer">
-    <property name="icon">
-      <iconset resource="resources/resources.qrc">
-        <normaloff>:/icons/discord.png</normaloff>:/icons/discord.png
-      </iconset>
-    </property>
-    <property name="text">
+   <property name="icon">
+    <iconset resource="resources/resources.qrc">
+     <normaloff>:/icons/discord.png</normaloff>:/icons/discord.png</iconset>
+   </property>
+   <property name="text">
     <string>&amp;Discord Server...</string>
    </property>
   </action>
   <action name="actionCheckForUpdates">
-    <property name="icon">
-      <iconset resource="resources/resources.qrc">
-        <normaloff>:/icons/update.png</normaloff>:/icons/update.png
-      </iconset>
-    </property>
-    <property name="text">
+   <property name="icon">
+    <iconset resource="resources/resources.qrc">
+     <normaloff>:/icons/update.png</normaloff>:/icons/update.png</iconset>
+   </property>
+   <property name="text">
     <string>Check for &amp;Updates...</string>
    </property>
   </action>
   <action name="actionAboutQt">
-    <property name="icon">
-      <iconset resource="resources/resources.qrc">
-        <normaloff>:/icons/QT.png</normaloff>:/icons/QT.png
-      </iconset>
-    </property>
-    <property name="text">
+   <property name="icon">
+    <iconset resource="resources/resources.qrc">
+     <normaloff>:/icons/QT.png</normaloff>:/icons/QT.png</iconset>
+   </property>
+   <property name="text">
     <string>About &amp;Qt...</string>
    </property>
   </action>
   <action name="actionAbout">
-    <property name="icon">
-      <iconset resource="resources/resources.qrc">
-        <normaloff>:/icons/duck_64.png</normaloff>:/icons/duck_64.png
-      </iconset>
-    </property>
-    <property name="text">
+   <property name="icon">
+    <iconset resource="resources/resources.qrc">
+     <normaloff>:/icons/duck_64.png</normaloff>:/icons/duck_64.png</iconset>
+   </property>
+   <property name="text">
     <string>&amp;About DuckStation...</string>
    </property>
   </action>
@@ -643,7 +651,7 @@
    <property name="text">
     <string>Disable All Enhancements</string>
    </property>
-  </action> 
+  </action>
   <action name="actionDisableInterlacing">
    <property name="checkable">
     <bool>true</bool>
@@ -884,6 +892,147 @@
    </property>
    <property name="text">
     <string>Power Off &amp;Without Saving</string>
+   </property>
+  </action>
+  <action name="actionEnglish">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/en.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>English</string>
+   </property>
+  </action>
+  <action name="actionDeutsch">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/de.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Deutsch</string>
+   </property>
+  </action>
+  <action name="actionEspa_ol">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/es.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Español</string>
+   </property>
+  </action>
+  <action name="actionFran_ais">
+   <property name="icon">
+    <iconset>
+     <disabledon>:/icons/flags/fr.png</disabledon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Français</string>
+   </property>
+  </action>
+  <action name="action">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/he.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>עִברִית
+</string>
+   </property>
+  </action>
+  <action name="action_2">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/ja.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>日本語</string>
+   </property>
+  </action>
+  <action name="actionItalian">
+   <property name="icon">
+    <iconset>
+     <disabledon>:/icons/flags/it.png</disabledon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Italian</string>
+   </property>
+  </action>
+  <action name="actionNederlands">
+   <property name="icon">
+    <iconset>
+     <disabledon>:/icons/flags/nl.png</disabledon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Nederlands</string>
+   </property>
+  </action>
+  <action name="actionPolski">
+   <property name="icon">
+    <iconset>
+     <disabledon>:/icons/flags/pl.png</disabledon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Polski</string>
+   </property>
+  </action>
+  <action name="actionPortuguese_Pt">
+   <property name="icon">
+    <iconset>
+     <disabledon>:/icons/flags/pt-pt.png</disabledon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Portuguese (Pt)</string>
+   </property>
+  </action>
+  <action name="actionPortuguese_Br">
+   <property name="icon">
+    <iconset>
+     <disabledon>:/icons/flags/pt-br.png</disabledon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Portuguese (Br)</string>
+   </property>
+  </action>
+  <action name="actionP">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/ru.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Pусский</string>
+   </property>
+  </action>
+  <action name="actionTurkish">
+   <property name="icon">
+    <iconset>
+     <normalon>resources/icons/flags/tr@2x.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Turkish</string>
+   </property>
+  </action>
+  <action name="action_3">
+   <property name="icon">
+    <iconset>
+     <normalon>:/icons/flags/zh-cn.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>简体中文</string>
    </property>
   </action>
  </widget>
