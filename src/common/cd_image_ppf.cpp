@@ -72,16 +72,16 @@ bool CDImagePPF::Open(const char* filename, std::unique_ptr<CDImage> parent_imag
     m_replacement_offset = parent_image->GetIndex(1).start_lba_on_disc;
 
   // copy all the stuff from the parent image
-  m_filename = filename;
+  m_filename = parent_image->GetFileName();
   m_tracks = parent_image->GetTracks();
   m_indices = parent_image->GetIndices();
   m_parent_image = std::move(parent_image);
 
-  if (magic == '3FPP')
+  if (magic == 0x33465050) // PPF3
     return ReadV3Patch(fp.get());
-  else if (magic == '2FPP')
+  else if (magic == 0x32465050) // PPF2
     return ReadV2Patch(fp.get());
-  else if (magic == '1FPP')
+  else if (magic == 0x31465050) // PPF1
     return ReadV1Patch(fp.get());
 
   Log_ErrorPrintf("Unknown PPF magic %08X", magic);
@@ -99,7 +99,7 @@ u32 CDImagePPF::ReadFileIDDiz(std::FILE* fp, u32 version)
     return 0;
   }
 
-  if (magic != 'ZID.')
+  if (magic != 0x5A49442E) // .DIZ
     return 0;
 
   u32 dlen = 0;
@@ -432,9 +432,9 @@ std::unique_ptr<CDImage>
 CDImage::OverlayPPFPatch(const char* filename, std::unique_ptr<CDImage> parent_image,
                          ProgressCallback* progress /* = ProgressCallback::NullProgressCallback */)
 {
-  std::unique_ptr<CDImagePPF> memory_image = std::make_unique<CDImagePPF>();
-  if (!memory_image->Open(filename, std::move(parent_image)))
+  std::unique_ptr<CDImagePPF> ppf_image = std::make_unique<CDImagePPF>();
+  if (!ppf_image->Open(filename, std::move(parent_image)))
     return {};
 
-  return memory_image;
+  return ppf_image;
 }

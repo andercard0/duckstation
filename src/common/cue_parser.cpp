@@ -120,8 +120,6 @@ std::string_view File::GetToken(const char*& line)
 
 std::optional<MSF> File::GetMSF(const std::string_view& token)
 {
-  const u32 len = static_cast<u32>(token.length());
-
   static const s32 max_values[] = {std::numeric_limits<s32>::max(), 60, 75};
 
   u32 parts[3] = {};
@@ -190,7 +188,7 @@ bool File::ParseLine(const char* line, u32 line_number, Common::Error* error)
 
   if (TokenMatch(command, "POSTGAP"))
   {
-    Log_WarningPrintf("Ignoring '*%s' command", static_cast<int>(command.size()), command.data());
+    Log_WarningPrintf("Ignoring '%*s' command", static_cast<int>(command.size()), command.data());
     return true;
   }
 
@@ -276,7 +274,7 @@ bool File::HandleTrackCommand(const char* line, u32 line_number, Common::Error* 
     mode = TrackMode::Mode2Raw;
   else
   {
-    SetError(line_number, error, "Invalid mode: '*%s'", static_cast<int>(mode_str.length()), mode_str.data());
+    SetError(line_number, error, "Invalid mode: '%*s'", static_cast<int>(mode_str.length()), mode_str.data());
     return false;
   }
 

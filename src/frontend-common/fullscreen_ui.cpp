@@ -551,9 +551,7 @@ static void DoStartPath(const std::string& path, bool allow_resume)
     return;
   }
 
-  SystemBootParameters params;
-  params.filename = path;
-  s_host_interface->BootSystem(params);
+  s_host_interface->BootSystem(std::make_shared<SystemBootParameters>(path));
 }
 
 static void DoStartFile()
@@ -571,10 +569,7 @@ static void DoStartFile()
 
 static void DoStartBIOS()
 {
-  s_host_interface->RunLater([]() {
-    SystemBootParameters boot_params;
-    s_host_interface->BootSystem(boot_params);
-  });
+  s_host_interface->RunLater([]() { s_host_interface->BootSystem(std::make_shared<SystemBootParameters>()); });
   ClearImGuiFocus();
 }
 
@@ -2988,8 +2983,7 @@ void DrawGameListWindow()
 
   if (BeginFullscreenColumnWindow(0.0f, 450.0f, "game_list_info", ImVec4(0.11f, 0.15f, 0.17f, 1.00f)))
   {
-    const auto* window = ImGui::GetCurrentWindow();
-    const ImVec2 base_pos(window->DC.CursorPos);
+    const ImGuiWindow* window = ImGui::GetCurrentWindow();
 
     ImGui::SetCursorPos(LayoutScale(ImVec2(50.0f, 50.0f)));
     ImGui::Image(selected_entry ? GetGameListCover(selected_entry)->GetHandle() :
@@ -4118,7 +4112,6 @@ void DrawAchievementWindow()
 
   const ImVec4 background(0.13f, 0.13f, 0.13f, alpha);
   const ImVec2 display_size(ImGui::GetIO().DisplaySize);
-  const float window_width = LayoutScale(LAYOUT_SCREEN_WIDTH);
   const float heading_height = LayoutScale(heading_height_unscaled);
 
   if (BeginFullscreenWindow(
@@ -4129,6 +4122,8 @@ void DrawAchievementWindow()
     bool visible, hovered;
     bool pressed = MenuButtonFrame("achievements_heading", false, heading_height_unscaled, &visible, &hovered, &bb.Min,
                                    &bb.Max, 0, alpha);
+    UNREFERENCED_VARIABLE(pressed);
+
     if (visible)
     {
       const float padding = LayoutScale(10.0f);

@@ -52,7 +52,7 @@ Log_SetChannel(QtHostInterface);
 
 QtHostInterface::QtHostInterface(QObject* parent) : QObject(parent), CommonHostInterface()
 {
-  qRegisterMetaType<std::shared_ptr<const SystemBootParameters>>();
+  qRegisterMetaType<std::shared_ptr<SystemBootParameters>>();
   qRegisterMetaType<const GameListEntry*>();
   qRegisterMetaType<GPURenderer>();
 }
@@ -333,17 +333,17 @@ void QtHostInterface::setMainWindow(MainWindow* window)
   m_main_window = window;
 }
 
-void QtHostInterface::bootSystem(std::shared_ptr<const SystemBootParameters> params)
+void QtHostInterface::bootSystem(std::shared_ptr<SystemBootParameters> params)
 {
   if (!isOnWorkerThread())
   {
     QMetaObject::invokeMethod(this, "bootSystem", Qt::QueuedConnection,
-                              Q_ARG(std::shared_ptr<const SystemBootParameters>, std::move(params)));
+                              Q_ARG(std::shared_ptr<SystemBootParameters>, std::move(params)));
     return;
   }
 
   emit emulationStarting();
-  if (!BootSystem(*params))
+  if (!BootSystem(std::move(params)))
     return;
 
   // force a frame to be drawn to repaint the window
@@ -965,7 +965,7 @@ void QtHostInterface::populateSaveStateMenus(const char* game_code, QMenu* load_
   load_menu->clear();
   save_menu->clear();
 
-  connect(load_menu->addAction(tr("From File...")), &QAction::triggered, [this]() {
+  connect(load_menu->addAction(tr("Load From File...")), &QAction::triggered, [this]() {
     const QString path(
       QFileDialog::getOpenFileName(m_main_window, tr("Select Save State File"), QString(), tr("Save States (*.sav)")));
     if (path.isEmpty())
@@ -975,7 +975,7 @@ void QtHostInterface::populateSaveStateMenus(const char* game_code, QMenu* load_
   });
   load_menu->addSeparator();
 
-  connect(save_menu->addAction(tr("From File...")), &QAction::triggered, [this]() {
+  connect(save_menu->addAction(tr("Save To File...")), &QAction::triggered, [this]() {
     if (!System::IsValid())
       return;
 

@@ -168,13 +168,18 @@ void CommonHostInterface::InitializeUserDirectory()
     ReportError("Failed to create one or more user directories. This may cause issues at runtime.");
 }
 
-bool CommonHostInterface::BootSystem(const SystemBootParameters& parameters)
+bool CommonHostInterface::BootSystem(std::shared_ptr<SystemBootParameters> parameters)
 {
   // If the fullscreen UI is enabled, make sure it's finished loading the game list so we don't race it.
   if (m_display && m_fullscreen_ui_enabled)
     FullscreenUI::EnsureGameListLoaded();
 
-  ApplyRendererFromGameSettings(parameters.filename);
+  // In Challenge mode, do not allow loading a save state under any circumstances
+  // If it's present, drop it
+  if (IsCheevosChallengeModeActive())
+    parameters->state_stream.reset();
+
+  ApplyRendererFromGameSettings(parameters->filename);
 
   if (!HostInterface::BootSystem(parameters))
   {
@@ -186,8 +191,8 @@ bool CommonHostInterface::BootSystem(const SystemBootParameters& parameters)
   }
 
   // enter fullscreen if requested in the parameters
-  if (!g_settings.start_paused && ((parameters.override_fullscreen.has_value() && *parameters.override_fullscreen) ||
-                                   (!parameters.override_fullscreen.has_value() && g_settings.start_fullscreen)))
+  if (!g_settings.start_paused && ((parameters->override_fullscreen.has_value() && *parameters->override_fullscreen) ||
+                                   (!parameters->override_fullscreen.has_value() && g_settings.start_fullscreen)))
   {
     SetFullscreen(true);
   }
@@ -739,9 +744,7 @@ bool CommonHostInterface::CanResumeSystemFromFile(const char* filename)
 
 bool CommonHostInterface::ResumeSystemFromState(const char* filename, bool boot_on_failure)
 {
-  SystemBootParameters boot_params;
-  boot_params.filename = filename;
-  if (!BootSystem(boot_params))
+  if (!BootSystem(std::make_shared<SystemBootParameters>(filename)))
     return false;
 
   const bool global = System::GetRunningCode().empty();
@@ -1098,7 +1101,6 @@ void CommonHostInterface::DrawFPSWindow()
     position_y += text_size.y + spacing;                                                                               \
   } while (0)
 
-  const System::State state = System::GetState();
   if (System::GetState() == System::State::Running)
   {
     const float speed = System::GetEmulationSpeed();
@@ -2015,7 +2017,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                  });
 
   RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("ChangeDisc"),
-                 StaticString(TRANSLATABLE("Hotkeys", "Change Disc")), [this](bool pressed) {
+                 StaticString(TRANSLATABLE("Hotkeys", "Change Disc")), [](bool pressed) {
                    if (pressed && System::IsValid() && System::HasMediaSubImages())
                    {
                      const u32 current = System::GetMediaSubImageIndex();
@@ -2887,7 +2889,6 @@ void CommonHostInterface::LoadSettings(SettingsInterface& si)
   }
 
   const bool input_display_enabled = si.GetBoolValue("Display", "ShowInputs", false);
-  const bool input_display_state = static_cast<bool>(s_input_overlay_ui);
   if (input_display_enabled && !s_input_overlay_ui)
     s_input_overlay_ui = std::make_unique<FrontendCommon::InputOverlayUI>();
   else if (!input_display_enabled && s_input_overlay_ui)
@@ -2911,6 +2912,11 @@ void CommonHostInterface::FixIncompatibleSettings(bool display_osd_messages)
     g_settings.turbo_speed = (g_settings.turbo_speed != 0.0f) ? std::max(g_settings.turbo_speed, 1.0f) : 0.0f;
     g_settings.rewind_enable = false;
     g_settings.auto_load_cheats = false;
+    if (g_settings.cpu_overclock_enable && g_settings.GetCPUOverclockPercent() < 100)
+    {
+      g_settings.cpu_overclock_enable = false;
+      g_settings.UpdateOverclockActive();
+    }
     g_settings.debugging.enable_gdb_server = false;
     g_settings.debugging.show_vram = false;
     g_settings.debugging.show_gpu_state = false;
