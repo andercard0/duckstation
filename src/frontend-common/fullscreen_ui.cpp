@@ -541,8 +541,9 @@ static ImGuiFullscreen::FileSelectorFilters GetDiscImageFilters()
 
 static void DoStartPath(const std::string& path, bool allow_resume)
 {
-  // we can never resume from exe/psf
-  if (System::IsExeFileName(path.c_str()) || System::IsPsfFileName(path.c_str()))
+  // we can never resume from exe/psf, or when challenge mode is active
+  if (System::IsExeFileName(path.c_str()) || System::IsPsfFileName(path.c_str()) ||
+      s_host_interface->IsCheevosChallengeModeActive())
     allow_resume = false;
 
   if (allow_resume && g_settings.save_state_on_exit)
@@ -2280,6 +2281,11 @@ void DrawSettingsWindow()
                                     "When enabled, DuckStation will assume all achievements are locked and not "
                                     "send any unlock notifications to the server.",
                                     "Cheevos", "TestMode", false);
+        settings_changed |=
+          ToggleButtonForNonSetting(ICON_FA_MEDAL "  Test Unofficial Achievements",
+                                    "When enabled, DuckStation will list achievements from unofficial sets. These "
+                                    "achievements are not tracked by RetroAchievements.",
+                                    "Cheevos", "UnofficialTestMode", false);
         settings_changed |= ToggleButtonForNonSetting(ICON_FA_COMPACT_DISC "  Use First Disc From Playlist",
                                                       "When enabled, the first disc in a playlist will be used for "
                                                       "achievements, regardless of which disc is active.",
