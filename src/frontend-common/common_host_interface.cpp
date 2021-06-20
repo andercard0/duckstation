@@ -29,6 +29,7 @@
 #include "imgui.h"
 #include "imgui_fullscreen.h"
 #include "imgui_styles.h"
+#include "inhibit_screensaver.h"
 #include "ini_settings_interface.h"
 #include "input_overlay_ui.h"
 #include "save_state_selector_ui.h"
@@ -845,7 +846,7 @@ void CommonHostInterface::UpdateSpeedLimiterState()
   if (System::IsValid())
   {
     System::SetTargetSpeed(target_speed);
-    System::ResetPerformanceCounters();
+    System::ResetThrottler();
   }
 
   if (m_audio_stream)
@@ -975,6 +976,9 @@ void CommonHostInterface::OnSystemCreated()
 
   if (g_settings.display_post_processing && !m_display->SetPostProcessingChain(g_settings.display_post_process_chain))
     AddOSDMessage(TranslateStdString("OSDMessage", "Failed to load post processing shader chain."), 20.0f);
+
+  if (g_settings.inhibit_screensaver)
+    FrontendCommon::SuspendScreensaver(m_display->GetWindowInfo());
 }
 
 void CommonHostInterface::OnSystemPaused(bool paused)
@@ -990,6 +994,12 @@ void CommonHostInterface::OnSystemPaused(bool paused)
       SetFullscreen(false);
 
     StopControllerRumble();
+    FrontendCommon::ResumeScreensaver();
+  }
+  else
+  {
+    if (g_settings.inhibit_screensaver)
+      FrontendCommon::SuspendScreensaver(m_display->GetWindowInfo());
   }
 
   UpdateSpeedLimiterState();
@@ -1007,6 +1017,7 @@ void CommonHostInterface::OnSystemDestroyed()
     FullscreenUI::SystemDestroyed();
 
   StopControllerRumble();
+  FrontendCommon::ResumeScreensaver();
 }
 
 void CommonHostInterface::OnRunningGameChanged(const std::string& path, CDImage* image, const std::string& game_code,
@@ -1028,7 +1039,7 @@ void CommonHostInterface::OnRunningGameChanged(const std::string& path, CDImage*
   }
 
 #ifdef WITH_DISCORD_PRESENCE
-  UpdateDiscordPresence();
+  UpdateDiscordPresence(false);
 #endif
 
 #ifdef WITH_CHEEVOS
@@ -1925,6 +1936,7 @@ void CommonHostInterface::SetTurboEnabled(bool enabled)
 void CommonHostInterface::RegisterHotkeys()
 {
   RegisterGeneralHotkeys();
+  RegisterSystemHotkeys();
   RegisterGraphicsHotkeys();
   RegisterSaveStateHotkeys();
   RegisterAudioHotkeys();
@@ -1994,6 +2006,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                        if (!ConfirmMessage(confirmation_message))
                        {
                          System::ResetPerformanceCounters();
+                         System::ResetThrottler();
                          return;
                        }
                      }
@@ -2004,19 +2017,50 @@ void CommonHostInterface::RegisterGeneralHotkeys()
 
 #endif
 
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("Reset"),
-                 StaticString(TRANSLATABLE("Hotkeys", "Reset System")), [this](bool pressed) {
-                   if (pressed && System::IsValid())
-                     ResetSystem();
-                 });
-
   RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("Screenshot"),
                  StaticString(TRANSLATABLE("Hotkeys", "Save Screenshot")), [this](bool pressed) {
                    if (pressed && System::IsValid())
                      SaveScreenshot();
                  });
 
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("ChangeDisc"),
+#if !defined(__ANDROID__) && defined(WITH_CHEEVOS)
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("OpenAchievements"),
+                 StaticString(TRANSLATABLE("Hotkeys", "Open Achievement List")), [this](bool pressed) {
+                   if (pressed && System::IsValid())
+                   {
+                     if (!m_fullscreen_ui_enabled || !FullscreenUI::OpenAchievementsWindow())
+                     {
+                       AddOSDMessage(
+                         TranslateStdString("OSDMessage", "Achievements are disabled or unavailable for this game."),
+                         10.0f);
+                     }
+                   }
+                 });
+
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("OpenLeaderboards"),
+                 StaticString(TRANSLATABLE("Hotkeys", "Open Leaderboard List")), [this](bool pressed) {
+                   if (pressed && System::IsValid())
+                   {
+                     if (!m_fullscreen_ui_enabled || !FullscreenUI::OpenLeaderboardsWindow())
+                     {
+                       AddOSDMessage(
+                         TranslateStdString("OSDMessage", "Leaderboards are disabled or unavailable for this game."),
+                         10.0f);
+                     }
+                   }
+                 });
+#endif  // !defined(__ANDROID__) && defined(WITH_CHEEVOS)
+}
+
+void CommonHostInterface::RegisterSystemHotkeys()
+{
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("Reset"),
+                 StaticString(TRANSLATABLE("Hotkeys", "Reset System")), [this](bool pressed) {
+                   if (pressed && System::IsValid())
+                     ResetSystem();
+                 });
+
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("ChangeDisc"),
                  StaticString(TRANSLATABLE("Hotkeys", "Change Disc")), [](bool pressed) {
                    if (pressed && System::IsValid() && System::HasMediaSubImages())
                    {
@@ -2027,14 +2071,14 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                    }
                  });
 
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("SwapMemoryCards"),
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("SwapMemoryCards"),
                  StaticString(TRANSLATABLE("Hotkeys", "Swap Memory Card Slots")), [this](bool pressed) {
                    if (pressed && System::IsValid())
                      SwapMemoryCards();
                  });
 
 #ifndef __ANDROID__
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("FrameStep"),
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("FrameStep"),
                  StaticString(TRANSLATABLE("Hotkeys", "Frame Step")), [this](bool pressed) {
                    if (pressed && System::IsValid())
                    {
@@ -2045,7 +2089,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                    }
                  });
 
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("Rewind"),
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("Rewind"),
                  StaticString(TRANSLATABLE("Hotkeys", "Rewind")), [this](bool pressed) {
                    if (System::IsValid())
                    {
@@ -2063,7 +2107,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                    }
                  });
 
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("ToggleCheats"),
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("ToggleCheats"),
                  StaticString(TRANSLATABLE("Hotkeys", "Toggle Cheats")), [this](bool pressed) {
                    if (pressed && System::IsValid())
                    {
@@ -2074,7 +2118,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                    }
                  });
 #else
-  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("TogglePatchCodes"),
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("TogglePatchCodes"),
                  StaticString(TRANSLATABLE("Hotkeys", "Toggle Patch Codes")), [this](bool pressed) {
                    if (pressed && System::IsValid())
                    {
@@ -2087,7 +2131,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
 #endif
 
   RegisterHotkey(
-    StaticString(TRANSLATABLE("Hotkeys", "General")), StaticString("ToggleOverclocking"),
+    StaticString(TRANSLATABLE("Hotkeys", "System")), StaticString("ToggleOverclocking"),
     StaticString(TRANSLATABLE("Hotkeys", "Toggle Clock Speed Control (Overclocking)")), [this](bool pressed) {
       if (pressed && System::IsValid())
       {
@@ -2988,6 +3032,14 @@ void CommonHostInterface::CheckForSettingsChanges(const Settings& old_settings)
         m_display->SetPostProcessingChain({});
       }
     }
+
+    if (g_settings.inhibit_screensaver != old_settings.inhibit_screensaver)
+    {
+      if (g_settings.inhibit_screensaver)
+        FrontendCommon::SuspendScreensaver(m_display->GetWindowInfo());
+      else
+        FrontendCommon::ResumeScreensaver();
+    }
   }
 
   if (g_settings.log_level != old_settings.log_level || g_settings.log_filter != old_settings.log_filter ||
@@ -3763,7 +3815,7 @@ void CommonHostInterface::InitializeDiscordPresence()
   Discord_Initialize("705325712680288296", &handlers, 0, nullptr);
   m_discord_presence_active = true;
 
-  UpdateDiscordPresence();
+  UpdateDiscordPresence(false);
 }
 
 void CommonHostInterface::ShutdownDiscordPresence()
@@ -3774,12 +3826,30 @@ void CommonHostInterface::ShutdownDiscordPresence()
   Discord_ClearPresence();
   Discord_Shutdown();
   m_discord_presence_active = false;
+#ifdef WITH_CHEEVOS
+  m_discord_presence_cheevos_string.clear();
+#endif
 }
 
-void CommonHostInterface::UpdateDiscordPresence()
+void CommonHostInterface::UpdateDiscordPresence(bool rich_presence_only)
 {
   if (!m_discord_presence_active)
     return;
+
+#ifdef WITH_CHEEVOS
+  // Update only if RetroAchievements rich presence has changed
+  const std::string& new_rich_presence = Cheevos::GetRichPresenceString();
+  if (new_rich_presence == m_discord_presence_cheevos_string && rich_presence_only)
+  {
+    return;
+  }
+  m_discord_presence_cheevos_string = new_rich_presence;
+#else
+  if (rich_presence_only)
+  {
+    return;
+  }
+#endif
 
   // https://discord.com/developers/docs/rich-presence/how-to#updating-presence-update-presence-payload-fields
   DiscordRichPresence rp = {};
@@ -3798,6 +3868,22 @@ void CommonHostInterface::UpdateDiscordPresence()
     details_string.AppendString("No Game Running");
   }
 
+#ifdef WITH_CHEEVOS
+  SmallString state_string;
+  // Trim to 128 bytes as per Discord-RPC requirements
+  if (m_discord_presence_cheevos_string.length() >= 128)
+  {
+    // 124 characters + 3 dots + null terminator
+    state_string = m_discord_presence_cheevos_string.substr(0, 124);
+    state_string.AppendString("...");
+  }
+  else
+  {
+    state_string = m_discord_presence_cheevos_string;
+  }
+
+  rp.state = state_string;
+#endif
   rp.details = details_string;
 
   Discord_UpdatePresence(&rp);
@@ -3807,6 +3893,8 @@ void CommonHostInterface::PollDiscordPresence()
 {
   if (!m_discord_presence_active)
     return;
+
+  UpdateDiscordPresence(true);
 
   Discord_RunCallbacks();
 }

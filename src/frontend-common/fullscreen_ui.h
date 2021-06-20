@@ -19,6 +19,7 @@ enum class MainWindowType
   Settings,
   QuickMenu,
   Achievements,
+  Leaderboards,
 };
 
 enum class SettingsPage
@@ -48,6 +49,8 @@ void SystemDestroyed();
 void SystemPaused(bool paused);
 void OpenQuickMenu();
 void CloseQuickMenu();
+bool OpenAchievementsWindow();
+bool OpenLeaderboardsWindow();
 void Shutdown();
 void Render();
 

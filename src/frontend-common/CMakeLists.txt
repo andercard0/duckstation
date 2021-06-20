@@ -17,6 +17,8 @@ add_library(frontend-common
   game_settings.h
   icon.cpp
   icon.h
+  inhibit_screensaver.cpp
+  inhibit_screensaver.h
   ini_settings_interface.cpp
   ini_settings_interface.h
   input_overlay_ui.cpp
@@ -59,6 +61,11 @@ if(WIN32)
   target_link_libraries(frontend-common PRIVATE d3d11.lib dxgi.lib)
 endif()
 
+if(APPLE)
+  find_library(IOK_LIBRARY IOKit REQUIRED)
+  target_link_libraries(frontend-common PRIVATE "${IOK_LIBRARY}")
+endif()
+
 if(SDL2_FOUND)
   target_sources(frontend-common PRIVATE 
     sdl_audio_stream.cpp
@@ -87,6 +94,11 @@ if(USE_EVDEV)
     evdev_controller_interface.cpp
     evdev_controller_interface.h
   )
+endif()
+
+if(USE_X11)
+  target_compile_definitions(frontend-common PRIVATE "-DUSE_X11=1")
+  target_include_directories(frontend-common PRIVATE "${X11_INCLUDE_DIR}")
 endif()
 
 if(ENABLE_DISCORD_PRESENCE)

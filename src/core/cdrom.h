@@ -83,10 +83,7 @@ private:
     MOTOR_ON_RESPONSE_TICKS = 400000,
 
     MAX_FAST_FORWARD_RATE = 12,
-    FAST_FORWARD_RATE_STEP = 4,
-
-    // Actually varies depending the distance into the disc.
-    BASE_SECTORS_PER_TRACK = 9,
+    FAST_FORWARD_RATE_STEP = 4
   };
 
   static constexpr u8 INTERRUPT_REGISTER_MASK = 0x1F;
@@ -309,7 +306,7 @@ private:
   void StopMotor();
   void BeginSeeking(bool logical, bool read_after_seek, bool play_after_seek);
   void UpdatePositionWhileSeeking();
-  void UpdatePhysicalPosition();
+  void UpdatePhysicalPosition(bool update_logical);
   void SetHoldPosition(CDImage::LBA lba, bool update_subq);
   void ResetCurrentXAFile();
   void ResetAudioDecoder();
@@ -342,6 +339,7 @@ private:
   CDImage::LBA m_seek_end_lba{};
   CDImage::LBA m_physical_lba{}; // current position of the disc with respect to time
   u32 m_physical_lba_update_tick = 0;
+  u32 m_physical_lba_update_carry = 0;
   bool m_setloc_pending = false;
   bool m_read_after_seek = false;
   bool m_play_after_seek = false;

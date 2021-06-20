@@ -85,6 +85,7 @@ static void ReturnToMainWindow();
 static void DrawLandingWindow();
 static void DrawQuickMenu(MainWindowType type);
 static void DrawAchievementWindow();
+static void DrawLeaderboardsWindow();
 static void DrawDebugMenu();
 static void DrawStatsOverlay();
 static void DrawOSDMessages();
@@ -112,6 +113,7 @@ static bool s_quick_menu_was_open = false;
 static bool s_was_paused_on_quick_menu_open = false;
 static bool s_about_window_open = false;
 static u32 s_close_button_state = 0;
+static std::optional<u32> s_open_leaderboard_id;
 
 //////////////////////////////////////////////////////////////////////////
 // Resources
@@ -297,6 +299,29 @@ void CloseQuickMenu()
   ClearImGuiFocus();
 }
 
+bool OpenAchievementsWindow()
+{
+  const bool achievements_enabled = Cheevos::HasActiveGame() && (Cheevos::GetAchievementCount() > 0);
+  if (!achievements_enabled)
+    return false;
+
+  s_current_main_window = MainWindowType::Achievements;
+  s_quick_menu_was_open = false;
+  return true;
+}
+
+bool OpenLeaderboardsWindow()
+{
+  const bool leaderboards_enabled = Cheevos::HasActiveGame() && (Cheevos::GetLeaderboardCount() > 0);
+  if (!leaderboards_enabled)
+    return false;
+
+  s_current_main_window = MainWindowType::Leaderboards;
+  s_open_leaderboard_id.reset();
+  s_quick_menu_was_open = false;
+  return true;
+}
+
 void Shutdown()
 {
   if (s_game_list_load_thread.joinable())
@@ -342,6 +367,9 @@ void Render()
       break;
     case MainWindowType::Achievements:
       DrawAchievementWindow();
+      break;
+    case MainWindowType::Leaderboards:
+      DrawLeaderboardsWindow();
       break;
     default:
       break;
@@ -1204,6 +1232,7 @@ static bool ConfirmChallengeModeEnable()
   if (!s_host_interface->ConfirmMessage(message))
     return false;
 
+  SaveAndApplySettings();
   s_host_interface->PowerOffSystem(s_host_interface->ShouldSaveResumeState());
   return true;
 }
@@ -1296,6 +1325,10 @@ void DrawSettingsWindow()
         settings_changed |= ToggleButtonForNonSetting(
           "Hide Cursor In Fullscreen", "Hides the mouse pointer/cursor when the emulator is in fullscreen mode.",
           "Main", "HideCursorInFullscreen", true);
+        settings_changed |= ToggleButton(
+          "Inhibit Screensaver",
+          "Prevents the screen saver from activating and the host from sleeping while emulation is running.",
+          &s_settings_copy.inhibit_screensaver);
         settings_changed |=
           ToggleButton("Load Devices From Save States",
                        "When enabled, memory cards and controllers will be overwritten when save states are loaded.",
@@ -2267,8 +2300,6 @@ void DrawSettingsWindow()
           s_host_interface->RunLater([]() {
             if (!ConfirmChallengeModeEnable())
               s_host_interface->GetSettingsInterface()->SetBoolValue("Cheevos", "Enabled", false);
-            else
-              SaveAndApplySettings();
           });
         }
 
@@ -2299,8 +2330,6 @@ void DrawSettingsWindow()
           s_host_interface->RunLater([]() {
             if (!ConfirmChallengeModeEnable())
               s_host_interface->GetSettingsInterface()->SetBoolValue("Cheevos", "ChallengeMode", false);
-            else
-              SaveAndApplySettings();
           });
         }
 
@@ -2516,16 +2545,43 @@ void DrawQuickMenu(MainWindowType type)
     const ImVec2 subtitle_size(
       g_medium_font->CalcTextSizeA(g_medium_font->FontSize, std::numeric_limits<float>::max(), -1.0f, subtitle));
 
-    const ImVec2 title_pos(display_size.x - LayoutScale(20.0f + 50.0f + 20.0f) - title_size.x,
-                           display_size.y - LayoutScale(20.0f + 50.0f));
-    const ImVec2 subtitle_pos(display_size.x - LayoutScale(20.0f + 50.0f + 20.0f) - subtitle_size.x,
-                              title_pos.y + g_large_font->FontSize + LayoutScale(4.0f));
+    ImVec2 title_pos(display_size.x - LayoutScale(20.0f + 50.0f + 20.0f) - title_size.x,
+                     display_size.y - LayoutScale(20.0f + 50.0f));
+    ImVec2 subtitle_pos(display_size.x - LayoutScale(20.0f + 50.0f + 20.0f) - subtitle_size.x,
+                        title_pos.y + g_large_font->FontSize + LayoutScale(4.0f));
+    float rp_height = 0.0f;
+
+#ifdef WITH_CHEEVOS
+    if (Cheevos::IsActive())
+    {
+      const std::string& rp = Cheevos::GetRichPresenceString();
+      if (!rp.empty())
+      {
+        const float wrap_width = LayoutScale(350.0f);
+        const ImVec2 rp_size = g_medium_font->CalcTextSizeA(g_medium_font->FontSize, std::numeric_limits<float>::max(),
+                                                            wrap_width, rp.data(), rp.data() + rp.size());
+        rp_height = rp_size.y + LayoutScale(4.0f);
+
+        const ImVec2 rp_pos(display_size.x - LayoutScale(20.0f + 50.0f + 20.0f) - rp_size.x - rp_height,
+                            subtitle_pos.y + LayoutScale(4.0f));
+
+        title_pos.x -= rp_height;
+        title_pos.y -= rp_height;
+        subtitle_pos.x -= rp_height;
+        subtitle_pos.y -= rp_height;
+
+        dl->AddText(g_medium_font, g_medium_font->FontSize, rp_pos, IM_COL32(255, 255, 255, 255), rp.data(),
+                    rp.data() + rp.size(), wrap_width);
+      }
+    }
+#endif
 
     dl->AddText(g_large_font, g_large_font->FontSize, title_pos, IM_COL32(255, 255, 255, 255), title.c_str());
     dl->AddText(g_medium_font, g_medium_font->FontSize, subtitle_pos, IM_COL32(255, 255, 255, 255), subtitle);
 
-    const ImVec2 image_min(display_size - LayoutScale(20.0f + 50.0f, 20.0f + 50.0f));
-    const ImVec2 image_max(image_min + LayoutScale(50.0f, 50.0f));
+    const ImVec2 image_min(display_size.x - LayoutScale(20.0f + 50.0f) - rp_height,
+                           display_size.y - LayoutScale(20.0f + 50.0f) - rp_height);
+    const ImVec2 image_max(image_min.x + LayoutScale(50.0f) + rp_height, image_min.y + LayoutScale(50.0f) + rp_height);
     dl->AddImage(GetCoverForCurrentGame()->GetHandle(), image_min, image_max);
   }
 
@@ -2534,7 +2590,7 @@ void DrawQuickMenu(MainWindowType type)
   if (BeginFullscreenWindow(window_pos, window_size, "pause_menu", ImVec4(0.0f, 0.0f, 0.0f, 0.0f), 0.0f, 10.0f,
                             ImGuiWindowFlags_NoBackground))
   {
-    BeginMenuButtons(12, 1.0f, ImGuiFullscreen::LAYOUT_MENU_BUTTON_X_PADDING,
+    BeginMenuButtons(13, 1.0f, ImGuiFullscreen::LAYOUT_MENU_BUTTON_X_PADDING,
                      ImGuiFullscreen::LAYOUT_MENU_BUTTON_Y_PADDING,
                      ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY);
 
@@ -2551,10 +2607,15 @@ void DrawQuickMenu(MainWindowType type)
 #ifdef WITH_CHEEVOS
     const bool achievements_enabled = Cheevos::HasActiveGame() && (Cheevos::GetAchievementCount() > 0);
     if (ActiveButton(ICON_FA_TROPHY "  Achievements", false, achievements_enabled))
-      s_current_main_window = MainWindowType::Achievements;
+      OpenAchievementsWindow();
+
+    const bool leaderboards_enabled = Cheevos::HasActiveGame() && (Cheevos::GetLeaderboardCount() > 0);
+    if (ActiveButton(ICON_FA_STOPWATCH "  Leaderboards", false, leaderboards_enabled))
+      OpenLeaderboardsWindow();
 
 #else
     ActiveButton(ICON_FA_TROPHY "  Achievements", false, false);
+    ActiveButton(ICON_FA_STOPWATCH "  Leaderboards", false, false);
 #endif
 
     if (ActiveButton(ICON_FA_CAMERA "  Save Screenshot", false))
@@ -4262,9 +4323,354 @@ void DrawAchievementWindow()
   EndFullscreenWindow();
 }
 
+static void DrawLeaderboardListEntry(const Cheevos::Leaderboard& lboard)
+{
+  static constexpr float alpha = 0.8f;
+
+  TinyString id_str;
+  id_str.Format("%u", lboard.id);
+
+  ImRect bb;
+  bool visible, hovered;
+  bool pressed =
+    MenuButtonFrame(id_str, true, LAYOUT_MENU_BUTTON_HEIGHT, &visible, &hovered, &bb.Min, &bb.Max, 0, alpha);
+  if (!visible)
+    return;
+
+  const float midpoint = bb.Min.y + g_large_font->FontSize + LayoutScale(4.0f);
+  const float text_start_x = bb.Min.x + LayoutScale(15.0f);
+  const ImRect title_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+  const ImRect summary_bb(ImVec2(text_start_x, midpoint), bb.Max);
+
+  ImGui::PushFont(g_large_font);
+  ImGui::RenderTextClipped(title_bb.Min, title_bb.Max, lboard.title.c_str(), lboard.title.c_str() + lboard.title.size(),
+                           nullptr, ImVec2(0.0f, 0.0f), &title_bb);
+  ImGui::PopFont();
+
+  if (!lboard.description.empty())
+  {
+    ImGui::PushFont(g_medium_font);
+    ImGui::RenderTextClipped(summary_bb.Min, summary_bb.Max, lboard.description.c_str(),
+                             lboard.description.c_str() + lboard.description.size(), nullptr, ImVec2(0.0f, 0.0f),
+                             &summary_bb);
+    ImGui::PopFont();
+  }
+
+  if (pressed)
+  {
+    s_open_leaderboard_id = lboard.id;
+  }
+}
+
+static void DrawLeaderboardEntry(const Cheevos::LeaderboardEntry& lbEntry, float rank_column_width,
+                                 float name_column_width, float column_spacing)
+{
+  static constexpr float alpha = 0.8f;
+
+  ImRect bb;
+  bool visible, hovered;
+  bool pressed = MenuButtonFrame(lbEntry.user.c_str(), true, LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY, &visible, &hovered,
+                                 &bb.Min, &bb.Max, 0, alpha);
+  if (!visible)
+    return;
+
+  const float spacing = LayoutScale(10.0f);
+  const float midpoint = bb.Min.y + g_large_font->FontSize + LayoutScale(4.0f);
+  float text_start_x = bb.Min.x + LayoutScale(15.0f);
+  SmallString text;
+
+  text.Format("%u", lbEntry.rank);
+
+  ImGui::PushFont(g_large_font);
+  if (lbEntry.is_self)
+  {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(255, 242, 0, 255));
+  }
+
+  const ImRect rank_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+  ImGui::RenderTextClipped(rank_bb.Min, rank_bb.Max, text.GetCharArray(), text.GetCharArray() + text.GetLength(),
+                           nullptr, ImVec2(0.0f, 0.0f), &rank_bb);
+  text_start_x += rank_column_width + column_spacing;
+
+  const ImRect user_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+  ImGui::RenderTextClipped(user_bb.Min, user_bb.Max, lbEntry.user.c_str(), lbEntry.user.c_str() + lbEntry.user.size(),
+                           nullptr, ImVec2(0.0f, 0.0f), &user_bb);
+  text_start_x += name_column_width + column_spacing;
+
+  const ImRect score_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+  ImGui::RenderTextClipped(score_bb.Min, score_bb.Max, lbEntry.formatted_score.c_str(),
+                           lbEntry.formatted_score.c_str() + lbEntry.formatted_score.size(), nullptr,
+                           ImVec2(0.0f, 0.0f), &score_bb);
+
+  if (lbEntry.is_self)
+  {
+    ImGui::PopStyleColor();
+  }
+
+  ImGui::PopFont();
+
+  // This API DOES list the submission date/time, but is it relevant?
+#if 0
+  if (!cheevo.locked)
+  {
+    ImGui::PushFont(g_medium_font);
+
+    const ImRect time_bb(ImVec2(text_start_x, bb.Min.y),
+      ImVec2(bb.Max.x, bb.Min.y + g_medium_font->FontSize + LayoutScale(4.0f)));
+    text.Format("Unlocked 21 Feb, 2019 @ 3:14am");
+    ImGui::RenderTextClipped(time_bb.Min, time_bb.Max, text.GetCharArray(), text.GetCharArray() + text.GetLength(),
+      nullptr, ImVec2(1.0f, 0.0f), &time_bb);
+    ImGui::PopFont();
+  }
+#endif
+
+  if (pressed)
+  {
+    // Anything?
+  }
+}
+
+void DrawLeaderboardsWindow()
+{
+  static constexpr float alpha = 0.8f;
+  static constexpr float heading_height_unscaled = 110.0f;
+
+  ImGui::SetNextWindowBgAlpha(alpha);
+
+  const bool is_leaderboard_open = s_open_leaderboard_id.has_value();
+  bool close_leaderboard_on_exit = false;
+
+  const ImVec4 background(0.13f, 0.13f, 0.13f, alpha);
+  const ImVec2 display_size(ImGui::GetIO().DisplaySize);
+  const float padding = LayoutScale(10.0f);
+  const float spacing = LayoutScale(10.0f);
+  float heading_height = LayoutScale(heading_height_unscaled);
+  if (is_leaderboard_open)
+  {
+    // Add space for a legend - spacing + 1 line of text + spacing + line
+    heading_height += spacing + LayoutScale(LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY) + spacing;
+  }
+
+  const float rank_column_width =
+    g_large_font->CalcTextSizeA(g_large_font->FontSize, std::numeric_limits<float>::max(), -1.0f, "99999").x;
+  const float name_column_width =
+    g_large_font
+      ->CalcTextSizeA(g_large_font->FontSize, std::numeric_limits<float>::max(), -1.0f, "WWWWWWWWWWWWWWWWWWWW")
+      .x;
+  const float column_spacing = spacing * 2.0f;
+
+  if (BeginFullscreenWindow(
+        ImVec2(0.0f, 0.0f), ImVec2(display_size.x, heading_height), "leaderboards_heading", background, 0.0f, 0.0f,
+        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollWithMouse))
+  {
+    ImRect bb;
+    bool visible, hovered;
+    bool pressed = MenuButtonFrame("leaderboards_heading", false, heading_height_unscaled, &visible, &hovered, &bb.Min,
+                                   &bb.Max, 0, alpha);
+    UNREFERENCED_VARIABLE(pressed);
+
+    if (visible)
+    {
+      const float image_height = LayoutScale(85.0f);
+
+      const ImVec2 icon_min(bb.Min + ImVec2(padding, padding));
+      const ImVec2 icon_max(icon_min + ImVec2(image_height, image_height));
+
+      const std::string& icon_path = Cheevos::GetGameIcon();
+      if (!icon_path.empty())
+      {
+        HostDisplayTexture* badge = GetCachedTexture(icon_path);
+        if (badge)
+        {
+          ImGui::GetWindowDrawList()->AddImage(badge->GetHandle(), icon_min, icon_max, ImVec2(0.0f, 0.0f),
+                                               ImVec2(1.0f, 1.0f), IM_COL32(255, 255, 255, 255));
+        }
+      }
+
+      float left = bb.Min.x + padding + image_height + spacing;
+      float right = bb.Max.x - padding;
+      float top = bb.Min.y + padding;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      SmallString text;
+      ImVec2 text_size;
+
+      const u32 leaderboard_count = Cheevos::GetLeaderboardCount();
+
+      if (!is_leaderboard_open)
+      {
+        if (FloatingButton(ICON_FA_WINDOW_CLOSE, 10.0f, 10.0f, -1.0f, -1.0f, 1.0f, 0.0f, true, g_large_font) ||
+            WantsToCloseMenu())
+        {
+          ReturnToMainWindow();
+        }
+      }
+      else
+      {
+        if (FloatingButton(ICON_FA_CARET_SQUARE_LEFT, 10.0f, 10.0f, -1.0f, -1.0f, 1.0f, 0.0f, true, g_large_font) ||
+            WantsToCloseMenu())
+        {
+          close_leaderboard_on_exit = true;
+        }
+      }
+
+      const ImRect title_bb(ImVec2(left, top), ImVec2(right, top + g_large_font->FontSize));
+      text.Assign(Cheevos::GetGameTitle());
+
+      top += g_large_font->FontSize + spacing;
+
+      ImGui::PushFont(g_large_font);
+      ImGui::RenderTextClipped(title_bb.Min, title_bb.Max, text.GetCharArray(), text.GetCharArray() + text.GetLength(),
+                               nullptr, ImVec2(0.0f, 0.0f), &title_bb);
+      ImGui::PopFont();
+
+      if (s_open_leaderboard_id)
+      {
+        const Cheevos::Leaderboard* lboard = Cheevos::GetLeaderboardByID(*s_open_leaderboard_id);
+        if (lboard != nullptr)
+        {
+          const ImRect subtitle_bb(ImVec2(left, top), ImVec2(right, top + g_large_font->FontSize));
+          text.Assign(lboard->title);
+
+          top += g_large_font->FontSize + spacing;
+
+          ImGui::PushFont(g_large_font);
+          ImGui::RenderTextClipped(subtitle_bb.Min, subtitle_bb.Max, text.GetCharArray(),
+                                   text.GetCharArray() + text.GetLength(), nullptr, ImVec2(0.0f, 0.0f), &subtitle_bb);
+          ImGui::PopFont();
+
+          text.Assign(lboard->description);
+        }
+        else
+        {
+          text.Clear();
+        }
+      }
+      else
+      {
+        text.Format("This game has %u leaderboards.", leaderboard_count);
+      }
+
+      const ImRect summary_bb(ImVec2(left, top), ImVec2(right, top + g_medium_font->FontSize));
+      top += g_medium_font->FontSize + spacing;
+
+      ImGui::PushFont(g_medium_font);
+      ImGui::RenderTextClipped(summary_bb.Min, summary_bb.Max, text.GetCharArray(),
+                               text.GetCharArray() + text.GetLength(), nullptr, ImVec2(0.0f, 0.0f), &summary_bb);
+
+      if (!IsCheevosHardcoreModeActive())
+      {
+        const ImRect hardcore_warning_bb(ImVec2(left, top), ImVec2(right, top + g_medium_font->FontSize));
+        top += g_medium_font->FontSize + spacing;
+
+        ImGui::RenderTextClipped(
+          hardcore_warning_bb.Min, hardcore_warning_bb.Max,
+          "Submitting scores is DISABLED because Hardcore Mode is off. Leaderboards are read-only.", nullptr, nullptr,
+          ImVec2(0.0f, 0.0f), &hardcore_warning_bb);
+      }
+
+      ImGui::PopFont();
+    }
+
+    if (is_leaderboard_open)
+    {
+      pressed = MenuButtonFrame("legend", false, LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY, &visible, &hovered, &bb.Min,
+                                &bb.Max, 0, alpha);
+
+      UNREFERENCED_VARIABLE(pressed);
+
+      if (visible)
+      {
+        const Cheevos::Leaderboard* lboard = Cheevos::GetLeaderboardByID(*s_open_leaderboard_id);
+
+        const float midpoint = bb.Min.y + g_large_font->FontSize + LayoutScale(4.0f);
+        float text_start_x = bb.Min.x + LayoutScale(15.0f) + padding;
+
+        ImGui::PushFont(g_large_font);
+
+        const ImRect rank_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+        ImGui::RenderTextClipped(rank_bb.Min, rank_bb.Max, "Rank", nullptr, nullptr, ImVec2(0.0f, 0.0f), &rank_bb);
+        text_start_x += rank_column_width + column_spacing;
+
+        const ImRect user_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+        ImGui::RenderTextClipped(user_bb.Min, user_bb.Max, "Name", nullptr, nullptr, ImVec2(0.0f, 0.0f), &user_bb);
+        text_start_x += name_column_width + column_spacing;
+
+        const ImRect score_bb(ImVec2(text_start_x, bb.Min.y), ImVec2(bb.Max.x, midpoint));
+        ImGui::RenderTextClipped(score_bb.Min, score_bb.Max,
+                                 lboard != nullptr && Cheevos::IsLeaderboardTimeType(*lboard) ? "Time" : "Score",
+                                 nullptr, nullptr, ImVec2(0.0f, 0.0f), &score_bb);
+
+        ImGui::PopFont();
+
+        const float line_thickness = LayoutScale(1.0f);
+        const float line_padding = LayoutScale(5.0f);
+        const ImVec2 line_start(bb.Min.x, bb.Min.y + g_large_font->FontSize + line_padding);
+        const ImVec2 line_end(bb.Max.x, line_start.y);
+        ImGui::GetWindowDrawList()->AddLine(line_start, line_end, ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                                            line_thickness);
+      }
+    }
+  }
+  EndFullscreenWindow();
+
+  ImGui::SetNextWindowBgAlpha(alpha);
+
+  if (!is_leaderboard_open)
+  {
+    if (BeginFullscreenWindow(ImVec2(0.0f, heading_height), ImVec2(display_size.x, display_size.y - heading_height),
+                              "leaderboards", background, 0.0f, 0.0f, 0))
+    {
+      BeginMenuButtons();
+
+      Cheevos::EnumerateLeaderboards([](const Cheevos::Leaderboard& lboard) -> bool {
+        DrawLeaderboardListEntry(lboard);
+
+        return true;
+      });
+
+      EndMenuButtons();
+    }
+    EndFullscreenWindow();
+  }
+  else
+  {
+    if (BeginFullscreenWindow(ImVec2(0.0f, heading_height), ImVec2(display_size.x, display_size.y - heading_height),
+                              "leaderboard", background, 0.0f, 0.0f, 0))
+    {
+      BeginMenuButtons();
+
+      const auto result = Cheevos::TryEnumerateLeaderboardEntries(
+        *s_open_leaderboard_id,
+        [rank_column_width, name_column_width, column_spacing](const Cheevos::LeaderboardEntry& lbEntry) -> bool {
+          DrawLeaderboardEntry(lbEntry, rank_column_width, name_column_width, column_spacing);
+          return true;
+        });
+
+      if (!result.has_value())
+      {
+        ImGui::PushFont(g_large_font);
+
+        const ImVec2 pos_min(0.0f, heading_height);
+        const ImVec2 pos_max(display_size.x, display_size.y);
+        ImGui::RenderTextClipped(pos_min, pos_max, "Downloading leaderboard data, please wait...", nullptr, nullptr,
+                                 ImVec2(0.5f, 0.5f));
+
+        ImGui::PopFont();
+      }
+
+      EndMenuButtons();
+    }
+    EndFullscreenWindow();
+  }
+
+  if (close_leaderboard_on_exit)
+    s_open_leaderboard_id.reset();
+}
+
 #else
 
 void DrawAchievementWindow() {}
+void DrawLeaderboardsWindow() {}
 
 #endif
 
