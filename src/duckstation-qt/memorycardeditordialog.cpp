@@ -11,7 +11,8 @@ static constexpr char MEMORY_CARD_IMAGE_FILTER[] =
   QT_TRANSLATE_NOOP("MemoryCardEditorDialog", "All Memory Card Types (*.mcd *.mcr *.mc)");
 static constexpr char MEMORY_CARD_IMPORT_FILTER[] =
   QT_TRANSLATE_NOOP("MemoryCardEditorDialog", "All Importable Memory Card Types (*.mcd *.mcr *.mc *.gme)");
-static constexpr char SINGLE_SAVEFILE_FILTER[] = TRANSLATABLE("MemoryCardEditorDialog", "Single Save Files (*.mcs)");
+static constexpr char SINGLE_SAVEFILE_FILTER[] =
+  TRANSLATABLE("MemoryCardEditorDialog", "Single Save Files (*.mcs);;All Files (*.*)");
 
 MemoryCardEditorDialog::MemoryCardEditorDialog(QWidget* parent) : QDialog(parent)
 {
@@ -43,9 +44,17 @@ MemoryCardEditorDialog::~MemoryCardEditorDialog() = default;
 
 bool MemoryCardEditorDialog::setCardA(const QString& path)
 {
-  const int index = m_ui.cardAPath->findData(QVariant(QDir::toNativeSeparators(path)));
+  int index = m_ui.cardAPath->findData(QVariant(QDir::toNativeSeparators(path)));
   if (index < 0)
-    return false;
+  {
+    QFileInfo file(path);
+    if (!file.exists())
+      return false;
+
+    QSignalBlocker sb(m_card_a.path_cb);
+    m_card_a.path_cb->addItem(file.baseName(), QVariant(path));
+    index = m_card_a.path_cb->count() - 1;
+  }
 
   m_ui.cardAPath->setCurrentIndex(index);
   return true;
@@ -53,12 +62,28 @@ bool MemoryCardEditorDialog::setCardA(const QString& path)
 
 bool MemoryCardEditorDialog::setCardB(const QString& path)
 {
-  const int index = m_ui.cardBPath->findData(QVariant(QDir::toNativeSeparators(path)));
+  int index = m_ui.cardBPath->findData(QVariant(QDir::toNativeSeparators(path)));
   if (index < 0)
-    return false;
+  {
+    QFileInfo file(path);
+    if (!file.exists())
+      return false;
+
+    QSignalBlocker sb(m_card_b.path_cb);
+    m_card_b.path_cb->addItem(file.baseName(), QVariant(path));
+    index = m_card_b.path_cb->count() - 1;
+  }
 
   m_ui.cardBPath->setCurrentIndex(index);
   return true;
+}
+
+bool MemoryCardEditorDialog::createMemoryCard(const QString& path)
+{
+  MemoryCardImage::DataArray data;
+  MemoryCardImage::Format(&data);
+
+  return MemoryCardImage::SaveToFile(data, path.toUtf8().constData());
 }
 
 void MemoryCardEditorDialog::resizeEvent(QResizeEvent* ev)
@@ -93,6 +118,8 @@ void MemoryCardEditorDialog::connectUi()
   connect(m_ui.saveCardB, &QPushButton::clicked, [this]() { saveCard(&m_card_b); });
   connect(m_ui.importCardA, &QPushButton::clicked, [this]() { importCard(&m_card_a); });
   connect(m_ui.importCardB, &QPushButton::clicked, [this]() { importCard(&m_card_b); });
+  connect(m_ui.formatCardA, &QPushButton::clicked, [this]() { formatCard(&m_card_a); });
+  connect(m_ui.formatCardB, &QPushButton::clicked, [this]() { formatCard(&m_card_b); });
   connect(m_ui.exportFile, &QPushButton::clicked, this, &MemoryCardEditorDialog::doExportSaveFile);
   connect(m_ui.importFileToCardA, &QPushButton::clicked, [this]() { importSaveFile(&m_card_a); });
   connect(m_ui.importFileToCardB, &QPushButton::clicked, [this]() { importSaveFile(&m_card_b); });
@@ -434,6 +461,29 @@ void MemoryCardEditorDialog::importCard(Card* card)
   updateButtonState();
 }
 
+void MemoryCardEditorDialog::formatCard(Card* card)
+{
+  promptForSave(card);
+
+  if (QMessageBox::question(this, tr("Format memory card?"),
+                            tr("Formatting the memory card will destroy all saves, and they will not be recoverable. "
+                               "The memory card which will be formatted is located at '%1'.")
+                              .arg(QString::fromStdString(card->filename)),
+                            QMessageBox::Yes, QMessageBox::No) == QMessageBox::No)
+  {
+    return;
+  }
+
+  clearSelection();
+
+  MemoryCardImage::Format(&card->data);
+
+  updateCardTable(card);
+  updateCardBlocksFree(card);
+  setCardDirty(card);
+  updateButtonState();
+}
+
 void MemoryCardEditorDialog::importSaveFile(Card* card)
 {
   QString filename =
@@ -491,4 +541,6 @@ void MemoryCardEditorDialog::updateButtonState()
   m_ui.importCardB->setEnabled(card_b_present);
   m_ui.importFileToCardA->setEnabled(card_a_present);
   m_ui.importFileToCardB->setEnabled(card_b_present);
+  m_ui.formatCardA->setEnabled(card_a_present);
+  m_ui.formatCardB->setEnabled(card_b_present);
 }
