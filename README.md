@@ -1,155 +1,157 @@
-# DuckStation - PlayStation 1, aka. PSX Emulator
-[Latest News](#latest-news) | [Features](#features) | [Screenshots](#screenshots) | [Downloading and Running](#downloading-and-running) | [Libretro Core](#libretro-core) | [Building](#building) | [Disclaimers](#disclaimers)
+# DuckStation - mais conhecido como emulador de PlayStation 1
+[Últimas noticias](#Últimas-Notícias) | [Caracteristicas](#Características) | [Capturas de tela](#screenshots) | [Como baixar e configurar](#Como-baixar-e-configurar) | [Núcleo libretro](#Núcleo-libretro) | [Construindo](#Baixando) | [Avisos](#avisos)
 
-**Discord Server:** https://discord.gg/Buktv3t
+**Servidor no Discord:** https://discord.gg/Buktv3t
 
-**Latest Builds for Windows and Linux (AppImage)** https://github.com/stenzek/duckstation/releases/tag/latest
+**Últimos lançamentos para Windows e Linux (AppImage)** https://github.com/stenzek/duckstation/releases/tag/latest
 
 **Available on Google Play:** https://play.google.com/store/apps/details?id=com.github.stenzek.duckstation
 
-**Game Compatibility List:** https://docs.google.com/spreadsheets/d/1H66MxViRjjE5f8hOl5RQmF5woS1murio2dsLn14kEqo/edit
+**Lista de compatibilidade de jogos:** https://docs.google.com/spreadsheets/d/1H66MxViRjjE5f8hOl5RQmF5woS1murio2dsLn14kEqo/edit
 
-**Wiki:** https://www.duckstation.org/wiki/
+**Wiki do projeto:** https://www.duckstation.org/wiki/
 
-DuckStation is an simulator/emulator of the Sony PlayStation(TM) console, focusing on playability, speed, and long-term maintainability. The goal is to be as accurate as possible while maintaining performance suitable for low-end devices. "Hack" options are discouraged, the default configuration should support all playable games with only some of the enhancements having compatibility issues.
+DuckStation é um simulador/emulador do console da Sony Playstation 1, com foco na jogabilidade, velocidade e manutenção de longo prazo. O objetivo é ser o mais preciso possível, mantendo o desempenho adequado para dispositivos de baixo custo. As funções de 'hacks' (modificações) não são muito apoiadas por serem instáveis na maioria dos casos; as configurações padrão já oferecem suporte a todos os jogos já categorizados como jogáveis até o momento.
 
-A "BIOS" ROM image is required to to start the emulator and to play games. You can use an image from any hardware version or region, although mismatching game regions and BIOS regions may have compatibility issues. A ROM image is not provided with the emulator for legal reasons, you should dump this from your own console using Caetla or other means.
+Um arquivo de "BIOS" é obrigátorio para inicar o emulador para que os jogos iniciem. Você pode usar qualquer arquivo de diversas regiões de consoles, embora regiões de jogo diferentes e regiões de BIOS possam ter problemas de compatibilidade entre si. O arquivo de BIOS não pode ser compartilhado junto com o emulador de forma nenhuma por questões legais, você deve fazer o processo chamado de 'dump' ou despejo do arquivo do seu próprio console; usando o Caetla ou outros meios disponíveis.
 
-## Latest News
-Older entries are available at https://github.com/stenzek/duckstation/blob/master/NEWS.md
+## Últimas Notícias
+As mais antigas estão disponíveis em: https://github.com/stenzek/duckstation/blob/master/NEWS.md
 
-- 2021/06/25: Ability to undelete files from memory card editor added.
-- 2021/06/22: Measured achievements for RetroAchievements added.
-- 2021/06/19: Leaderboards for RetroAchievements added.
-- 2021/06/01: Auto loading/applying of PPF patches added.
-- 2021/05/23: Save RAM (srm) support added to libretro core.
-- 2021/05/23: CD-ROM seek speedup enhancement added.
-- 2021/05/16: Auto fire (toggle pressing) buttons added.
-- 2021/05/02: New pause menu added to Android app.
-- 2021/04/29: Custom aspect ratio support added.
-- 2021/03/20: Memory card editor added to Android app.
-- 2021/03/17: Add support for loading **homebrew** PBP images. PSN images are not loadable due to potential legal issues surrounding the encryption.
-- 2021/03/14: Multiple controllers, multitap, and external controller vibration added to Android app. You will need to rebind your controllers.
-- 2021/03/14: RetroAchievements added to Android app.
-- 2021/03/03: RetroAchievements are now available. You can now log in to your retroacheivements.org account in DuckStation and gain points in supported games. Currently only for Windows/Linux/Mac, Android will be added in the future.
-- 2021/03/03: Multitap is now supported for up to 8 controllers. You can choose which of the two main controller ports have taps connected in Console Settings and bind controllers in Controller Settings.
-- 2021/03/03: Ability to add/remove touchscreen controller buttons and change opacity added for the Android app.
-- 2021/01/31: "Fullscreen UI" added, aka "Big Duck/TV Mode". This interface is fully navigatible with a controller. Currently it's limited to the NoGUI frontend, but it will be available directly in the Qt frontend in the near future, with more features being added (e.g. game grid) as well.
-- 2021/01/24: Runahead added - work around input lag in some games by running frames ahead of time and backtracking on input. DuckStation's implementation works with upscaling and the hardware renderers, but you still require a powerful computer for higher frame counts.
-- 2021/01/24: Rewind added - you can now "smooth rewind" (but not for long), or "skip rewind" (for much long) while playing.
+- 2021/06/25: Agora é possível recuperar arquivos do editor de cartão de memória adicionado.
+- 2021/06/22: Adicionado número de conquistas para RetroAchievements (Ex:.Conquistas 10/25).
+- 2021/06/19: Adicionados placares para RetroAchievements.
+- 2021/06/01: Auto carregamento / aplicação de modificações do tipo PPF para traduções.
+- 2021/05/23: Arquivo de salvamento do tipo SRM adicionado ao núcleo libretro.
+- 2021/05/23: Adicionado aceleração de busca do CD-ROM aprimorada.
+- 2021/05/16: Adicionado botões de Auto disparo.
+- 2021/05/02: Adicionado novo menu de pausa ao aplicativo Android.
+- 2021/04/29: Adicionado proporção de aspecto customizado.
+- 2021/03/20: Adicionado editor de cartão de memória ao aplicativo Android.
+- 2021/03/17: Adicionado para o carregamento de **homebrew** em formato PBP. Jogos em formato PBP oficiais da Sony NÃO SÃO e NÃO SERÃO suportados por riscos legais.
+- 2021/03/14: Múltiplos controles adicionados, função multitap, e vibração de controles adicionados ao aplicativo Android. Será necessário nova reatribuição de controles.
+- 2021/03/14: RetroAchievements adicionado ao Android.
+- 2021/03/03: RetroAchievements agora são suportados. Já é possível se conectar via site retroacheivements.org com sua conta criada lá via Duckstation e assim ganhar pontos com os jogos que tenham essas conquistas. No momento somente para Windows/Linux/Mac, Android terá em breve suporte.
+- 2021/03/03: Adicionado Multitap para até 8 controles. Você pode escolher qual das duas portas do controler principal quer usar para a função multitap.
+- 2021/03/03: Agora é possível adicionar/remover os botões de controle em tela adicionado ao Android.
+- 2021/01/31: Interface de usuário adicionado, também conhecido no Discord como "Big Duck Mode/Modo TV". Esta interface é facilmente navegável com o controle. No momento, só é funcional com o excecutável NOGUI.exe mas em breve será adicionado a opção de atalho para abri-la.
+- 2021/01/24: Pulo de quadros - solução de contorno para atrasos em alguns jogos perdendo quadros.
+- 2021/01/24: Função rebobinar - agora você pode "retroceder suavemente" (mas não por muito tempo) ou "pular o retrocesso" por algum tempo enquanto joga.
 
-## Features
+## Características
 
-DuckStation features a fully-featured frontend built using Qt, as well as a fullscreen/TV UI based on Dear ImGui. An Android version has been started, but is not yet feature complete.
+O DuckStation apresenta um front-end completo construído usando Qt, bem como uma interface de usuário de tela cheia / TV baseada em ImGui. Uma versão do Android está sendo feita, mas ainda não está completa.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/stenzek/duckstation/md-images/main-qt.png" alt="Main Window Screenshot" />
   <img src="https://raw.githubusercontent.com/stenzek/duckstation/md-images/bigduck.png" alt="Fullscreen UI Screenshot" />
 </p>
 
-Other features include:
+Outras características incluem:
 
- - CPU Recompiler/JIT (x86-64, armv7/AArch32 and AArch64)
- - Hardware (D3D11, OpenGL, Vulkan) and software rendering
- - Upscaling, texture filtering, and true colour (24-bit) in hardware renderers
- - PGXP for geometry precision, texture correction, and depth buffer emulation
- - Adaptive downsampling filter
- - Post processing shader chains
- - "Fast boot" for skipping BIOS splash/intro
- - Save state support
- - Windows, Linux, **highly experimental** macOS support
- - Supports bin/cue images, raw bin/img files, and MAME CHD formats.
- - Direct booting of homebrew executables
- - Direct loading of Portable Sound Format (psf) files
- - Digital and analog controllers for input (rumble is forwarded to host)
- - Namco GunCon lightgun support (simulated with mouse)
- - NeGcon support
- - Qt and NoGUI frontends for desktop
- - Automatic updates for Windows builds
- - Automatic content scanning - game titles/hashes are provided by redump.org
- - Optional automatic switching of memory cards for each game
- - Supports loading cheats from libretro or PCSXR format lists
- - Memory card editor and save importer
- - Emulated CPU overclocking
- - Integrated and remote debugging
- - Multitap controllers (up to 8 devices)
+ - CPU Recompilador/JIT (x86-64, armv7/AArch32 and AArch64)
+ - Hardware (D3D11, OpenGL, Vulkan) e renderizador por software
+ - Aumento de resolução, filtragem de textura, "função true color" (24-bit) nos renderizadores baseados por hardware (placa de vídeo)
+ - PGXP para precisão de geometria, correção de textura, e profundidade de campo
+ - Filtro adaptativo de resolução
+ - Opções de pós-processamento
+ - "Inicialização rápida" para pular a tela de BIOS ou introdução da Sony
+ - Suporte para salvamento rápido
+ - Windows, Linux, **altamente experimental** suporte MacOS
+ - Supporte aos arquivos bin/cue, bin/img, e formato CHD do Mame.
+ - Inicialização direta de arquivos homebrew
+ - Carregamento de arquivos (psf)
+ - Controles analógicos e digitais
+ - Controles Namco GunCon lightgun são suportados (simulados com o mouse)
+ - Controles NeGcon são suportados
+ - Qt e NoGUI para desktop
+ - Atualizador automático adicionado
+ - Verificação automática de conteúdo - título dos jogos/números validadores fornecidos por redump.org
+ - Troca automática opcional de cartões de memória para cada jogo
+ - Suporta o carregamento de trapaças no formato libretro ou PCSXR
+ - Editor de cartão de memória e de saves
+ - Aceleração do CPU emulado
+ - Depuração integrada
+ - Controle multitap (até 8 no total)
  - RetroAchievements
- - Automatic loading/applying of PPF patches
+ - Carregamento de modificações PPF - feito para tradução de jogos do Playstation 1.
 
-## System Requirements
- - A CPU faster than a potato. But it needs to be x86_64, AArch32/armv7, or AArch64/ARMv8, otherwise you won't get a recompiler and it'll be slow.
- - For the hardware renderers, a GPU capable of OpenGL 3.1/OpenGL ES 3.0/Direct3D 11 Feature Level 10.0 (or Vulkan 1.0) and above. So, basically anything made in the last 10 years or so.
- - SDL, XInput or DInput compatible game controller (e.g. XB360/XBOne). DualShock 3 users on Windows will need to install the official DualShock 3 drivers included as part of PlayStation Now.
+## Requisitos do sistema
+ - Um processador rápido ou não tão antigo. Mas precisa ter instrução x86_64, AArch32/armv7, ou AArch64/ARMv8, caso contrário você não conseguirá usar de maneira devida nem mesmo com opção recompilador ativada.
+ - Para renderizadores por hardware, uma GPU (placa de vídeo) que seja capaz de rodar OpenGL 3.1/ou OpenGL ES 3.0/Direct3D 11 Na versão 10.0 (ou versão Vulkan 1.0) ou mais recente. Sendo assim qualquer coisa feita nos últimos 10 anos ou mais.
+ - SDL, XInput ou DInput compatíveis com controle (e.g. XB360/XBOne). DualShock 3 usuários do Windows precisarão instalar os drivers oficiais para o DualShock 3 incluídos com os serviços do Playstation Now.
 
-## Downloading and running
-Binaries of DuckStation for Windows x64/ARM64, Linux x86_64 (in AppImage format), and Android ARMv7/ARMv8 are available via GitHub Releases and are automatically built with every commit/push. Binaries or packages distributed through other sources may be out of date and are not supported by the developer, please speak to them for support, not us.
+## Como baixar e configurar
+Os arquivos necessários do emulador x64/ARM64, Linux x86_64 (no formato AppImage), e Android ARMv7/ARMv8 estão disponíveis via GitHub lançados e automaticamente adicionados. Pacotes são distribuidos via outras fontes que não são atualizadas ou não gerenciadas pelo desenvolvedor, se este for seu caso qualquer problema fale com quem os distribui mas não conosco.
 
 ### Windows
 
-**Windows 10 is the only version of Windows supported by the developer.** Windows 7/8 may work, but is not supported. I am aware some users are still using Windows 7, but it is no longer supported by Microsoft and too much effort to get running on modern hardware. Game bugs are unlikely to be affected by the operating system, however performance issues should be verified on Windows 10 before reporting.
+**Windows 10 é o único sistema operacional suportado pelo desenvolvedor.** Windows 7/8 pode funcionar, mas não suportado. Estou ciente de que usuários ainda utilizam (Windows 7), mas não é sequer suportado pela própria Microsoft e requer muito esforço para manter atualizado corretamente.É bem improvável que problemas nos jogos sejam afetados pelo sistema operacional, no entanto, os problemas de desempenho devem ser verificados no Windows 10 também antes de relatar.
 
-To download:
- - Go to https://github.com/stenzek/duckstation/releases/tag/latest, and download the Windows x64 build. This is a zip archive containing the prebuilt binary.
- - Alternatively, direct download link: https://github.com/stenzek/duckstation/releases/download/latest/duckstation-windows-x64-release.zip
- - Extract the archive **to a subdirectory**. The archive has no root subdirectory, so extracting to the current directory will drop a bunch of files in your download directory if you do not extract to a subdirectory.
+Baixando:
+ - Vá até https://github.com/stenzek/duckstation/releases/tag/latest, e baixe a versão Windows x64. Este é o arquivo compactado contendo os arquivos necessários.
+ - Alternativamente, use o link para download direto: https://github.com/stenzek/duckstation/releases/download/latest/duckstation-windows-x64-release.zip
+ - Extraia o arquivo **dentro de uma pasta**. O arquvivo baixado não contém uma pasta criada por isso é necessária a criação e/ou descompactação dos arquivos para que não sejam extraídos diretamente onde foi baixado deixando vários arquivos misturados com os seus.
 
-Once downloaded and extracted, you can launch the emulator with `duckstation-qt-x64-ReleaseLTCG.exe`.
-To set up:
-1. Either configure the path to a BIOS image in the settings, or copy one or more PlayStation BIOS images to the bios/ subdirectory. On Windows, by default this will be located in `C:\Users\YOUR_USERNAME\Documents\DuckStation\bios`. If you don't want to use the Documents directory to save the BIOS/memory cards/etc, you can use portable mode. See [User directory](#user-directories).
-2. If using the Qt frontend, add the directories containing your disc images by clicking `Settings->Add Game Directory`.
-2. Select a game from the list, or open a disc image file and enjoy.
+Uma vez baixado e extraído, você será capaz de executar o emulador clicando no seguinte arquivo `duckstation-qt-x64-ReleaseLTCG.exe`.
+Configurando:
+1. Configure o caminho para uma imagem BIOS nas configurações, ou copie uma ou mais imagens do BIOS do PlayStation para o subdiretório / bios. No Windows, por padrão, ele estará localizado em `C:\Users\SEU_USUÁRIO\Documentos\DuckStation\bios`. Se você não quiser usar o diretório Documentos para salvar o BIOS / cartões de memória / etc, você pode usar o modo portátil. Veja em [Diretório do usuário](#Diretório-do-usuário).
+2. Caso esteja usando a versão QT, adicione os diretórios contendo seus jogos clicando em `Configurações-> Configurar lista de jogos -> Adicionar diretório`.
+2. Selecione um jogo da lista, ou abra a imagem do jogo diretamente.
 
-**If you get an error about `vcruntime140_1.dll` being missing, you will need to update your Visual C++ runtime.** You can do that from this page: https://support.microsoft.com/en-au/help/2977003/the-latest-supported-visual-c-downloads. Specifically, you want the x64 runtime, which can be downloaded from https://aka.ms/vs/16/release/vc_redist.x64.exe.
+**Caso veja o seguinte erro `vcruntime140_1.dll` não foi encontrado, será necessário atualizar o seu Visual C++.** você pode fazê-lo nesta página: https://support.microsoft.com/en-au/help/2977003/the-latest-supported-visual-c-downloads. Mais precisamente, o pacote x64, ao qual pode ser baixado em: https://aka.ms/vs/16/release/vc_redist.x64.exe.
 
-**Windows 7 users, TLS 1.2 is not supported by default and you will not be able to use the automatic updater or RetroAchievements.** This knowledge base article contains instructions for enabling TLS 1.1/1.2: https://support.microsoft.com/en-us/topic/update-to-enable-tls-1-1-and-tls-1-2-as-default-secure-protocols-in-winhttp-in-windows-c4bd73d2-31d7-761e-0178-11268bb10392
+**Usuários do Windows 7, TLS 1.2 não é supprtado nativamente no sistema sendo assim, não será possível usar o atualizador automático ou a função para conexão ao RetroAchievements.** Este artigo de base de conhecimento contém instruções para ativar a função TLS 1.1/1.2: 
+https://support.microsoft.com/en-us/topic/update-to-enable-tls-1-1-and-tls-1-2-as-default-secure-protocols-in-winhttp-in-windows-c4bd73d2-31d7-761e-0178-11268bb10392
 
-The Qt frontend includes an automatic update checker. Builds downloaded after 2020/08/07 will automatically check for updates each time the emulator starts, this can be disabled in Settings. Alternatively, you can force an update check by clicking `Help->Check for Updates`.
+A versão QT inclui um analisador de atualizações automáticas. Versões baixadas depois 07/08/2020 seraão automaticamente verificadas por atualizações cada vez que o emulador é iniciado, esta função pode ser desligada nas configurações. Como alternativa, é possível também checar manualmente no menu `Ajuda -> Checar por atualizações`.
 
 ### Linux
 
-#### Binaries
+#### Binários
 
-Prebuilt binaries for 64-bit Linux distros are available for download in the AppImage format. However, these binaries may be incompatible with older Linux distros (e.g. Ubuntu distros earlier than 18.04.4 LTS) due to older distros not providing newer versions of the C/C++ standard libraries required by the AppImage binaries.
+Versões contruídas para Linux estão disponíveis em formato AppImage. No entanto, esses arquivos podem não ser compatíveis com distribuições mais antigas do Linux (ex:. Ubuntu anteriores do que 18.04.4 LTS) devido a distros mais antigas não fornecerem bibliotecas padrão C / C ++ exigidas pelos binários AppImage.
 
-**Linux users are encouraged to build from source when possible and optionally create their own AppImages for features such as desktop integration if desired.**
+**Também é possível construir da fonte para usuários mais avançados de Linux.**
 
-To download:
- - Go to https://github.com/stenzek/duckstation/releases/tag/latest, and download either `duckstation-qt-x64.AppImage` or `duckstation-nogui-x64.AppImage` for your desired frontend.
- - Run `chmod a+x` on the downloaded AppImage -- following this step, the AppImage can be run like a typical executable.
- - Optionally use a program such as [appimaged](https://github.com/AppImage/appimaged) or [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) for desktop integration. [AppImageUpdate](https://github.com/AppImage/AppImageUpdate) can be used alongside appimaged to easily update your DuckStation AppImage.
+Baixando em:
+ - Vá até: https://github.com/stenzek/duckstation/releases/tag/latest, e baixe também `duckstation-qt-x64.AppImage` ou `duckstation-nogui-x64.AppImage` para a versão desejada.
+ - Rode o comando `chmod a+x` para o arquivo baixado AppImage -- seguindo este passo, o arquivo AppImage se tornará um arquvio executável pronto para uso.
+ - Outra opção seria usar [appimaged](https://github.com/AppImage/appimaged) ou [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) para integração com sistema. [AppImageUpdate](https://github.com/AppImage/AppImageUpdate) pode ser usado junto com o appimage para atualizar facilmente o seu DuckStation na versão appimage.
 
 ### macOS
 
-MacOS builds are no longer provided, as I cannot support a platform which I do not own hardware for, and I'm not spending $1000+ out of my own pocket for a machine which I have no other use for.
+Versões para MacOS não são mais disponibilizadas, não tenho o hardware citado, e não vou de forma alguma gastar $1000 do meu bolso em um harware somente para desenvolver o emulador.
 
-You can still build from [source](#building), but you will have to debug any issues encountered yourself.
+Ainda é possível construir da fonte [source](#Construindo), mas você mesmo terá de fazer depuração de probelmas encontrados por si mesmo.
 
-If anyone is willing to volunteer to support the platform to ensure users have a good experience, I'm more than happy to re-enable the releases.
+Se alguém estiver disposto a se voluntariar para oferecer suporte à plataforma para garantir que os usuários tenham uma boa experiência, estou mais do que feliz em reativar os lançamentos.
 
 ### Android
 
-A prebuilt APK is now available for Android. You will need a device with armv7 (32-bit ARM), AArch64 (64-bit ARM), or x86_64 (64-bit x86). 64-bit is preferred, the requirements are higher for 32-bit, you'll probably want at least a 1.5GHz CPU.
+APK construído disponível para Android. Será necessário um dispositivo com armv7 (32-bit ARM), AArch64 (64-bit ARM), ou x86_64 (64-bit x86). preferivelmente 64-bits, os requisitos são maiores para 32 bits, necessário no minímo um disposiivo com 1.5GHz.
 
-Download link: https://www.duckstation.org/android/duckstation-android.apk
+Link para baixar: https://www.duckstation.org/android/duckstation-android.apk
 
-Preview/beta download link: https://www.duckstation.org/android/duckstation-android-beta.apk
+Versão preview/beta: https://www.duckstation.org/android/duckstation-android-beta.apk
 
-Changelog link: https://www.duckstation.org/android/changelog.txt
+Registro de mudanças: https://www.duckstation.org/android/changelog.txt
 
-To use:
-1. Install and run the app for the first time.
-2. Add game directories by tapping the add button and selecting a directory. You can add additional directories afterwards by selecting "Edit Game Directories" from the menu.
-3. Tap a game to start. When you start a game for the first time it will prompt you to import a BIOS image.
+Usando:
+1. Instale e rode o aplicativo pelo menos uma vez.
+2. Adicione o diretório de jogos clicando no botão adicionar "+" e escolha um diretório. Você pode adicionar diretórios a mais escolhendo a opção "Editar diretório de jogos"a partir do menu.
+3. Clique em um jogo para iniciar. Quando você iniciar um jogo pela primeira vez lhe será solicitado que um arquivo de BIOS seja importado.
 
-If you have an external controller, you will need to map the buttons and sticks in settings.
+Se você tiver um controle externo, será necessário mapear os botões e eixos nas configurações.
 
-### Libretro Core
+### Núcleo libretro
 
-DuckStation is available as a libretro core, which can be loaded into a frontend such as RetroArch. It supports most features of the full frontend, within the constraints and limitations of being a libretro core.
+DuckStation está disponível como núcleo libretro, ao qual pode ser carregado em um front-end tal qual o Retroarch. Ele suporta a maioria dos recursos do front-end QT, dentro das restrições e limitações de ser um núcleo libretro.
 
-The DuckStation libretro core is not covered by the GPL license, but is still completely free to use. The only restriction is that COMMERCIAL DISTRIBUTION IS PROHIBITED. By downloading the libretro core, you agree that you will not distribute it with any paid applications, services, or products.
+O núcleo libretro não está coberto pela licença de código aberto GPL, ainda assim é totalmente grátuito.
+A única restrição é o USO E DISTRIBUIÇÃO COMERCIAL QUE É PROIBIDA. Baixanxo o núcleo libretro, você concorda que não irá distribuir ou vender junto com nenhuma aplicação paga, como applicações, serviços, ou produtos como os video-games embarcardos, raspberry pies e afins.
 
-The core is maintained by a third party, and is not provided as part of the GitHub release. You can download the core through the RetroArch buildbot/core updater, or from the links below. The changelog is viewable at https://www.duckstation.org/libretro/changelog.txt
+O núcleo é mantido por terceiros e não é fornecido como parte da versão do GitHub. Você pode baixar o núcleo por meio do atualizador ou dentro do próprio Retroarch ou ainda nos links abaixo. O registro de mudanças pode ser lido em: https://www.duckstation.org/libretro/changelog.txt
 
 - Windows x64 (64-bit): https://www.duckstation.org/libretro/duckstation_libretro_windows_x64.zip
 - Android AArch64 (64-bit): https://www.duckstation.org/libretro/duckstation_libretro_android_aarch64.zip
@@ -158,116 +160,114 @@ The core is maintained by a third party, and is not provided as part of the GitH
 - Linux AArch64 (64-bit): https://www.duckstation.org/libretro/duckstation_libretro_linux_aarch64.zip
 - Linux armv7 (32-bit): https://www.duckstation.org/libretro/duckstation_libretro_linux_armv7.zip
 
-### Region detection and BIOS images
-By default, DuckStation will emulate the region check present in the CD-ROM controller of the console. This means that when the region of the console does not match the disc, it will refuse to boot, giving a "Please insert PlayStation CD-ROM" message. DuckStation supports automatic detection disc regions, and if you set the console region to auto-detect as well, this should never be a problem.
+### Detecção de região e imagens BIOS
+Por padrão, o DuckStation irá emular a verificação de região presente no controlador de CD-ROM do console. Isto significa que quando a versão do console não bater com a do disco, o mesmo não vai iniciar, apresentando a seguinte mensagem "Please insert PlayStation CD-ROM". DuckStation suporta detecção automática das regiões dos discos, e se você definir a região do console para detecção automática também, isso nunca será um problema.
 
-If you wish to use auto-detection, you do not need to change the BIOS path each time you switch regions. Simply place the BIOS images for the other regions in the **same directory** as the configured image. This will probably be in the `bios/` subdirectory. Then set the console region to "Auto-Detect", and everything should work fine. The console/log will tell you if you are missing the image for the disc's region.
+Se você deseja usar a detecção automática, você não precisa mudar o caminho do BIOS cada vez que mudar de região. Basta somente colocar as outras imagens do BIOS de outras regiões **no mesmo diretório** que das imagens configuradas anteriormente. Terá que sempre ser na pasta `bios/`. Em seguida, defina a região do console para "Detectar região automaticamente" e tudo deve funcionar corretamente. O registro lhe informará se está faltando a imagem da região dos discos.
 
-Some users have been confused by the "BIOS Path" option, the reason it is a path and not a directory is so that an unknown BIOS revision can be used/tested.
+Alguns usuários ficaram confusos com a opção "Caminho do BIOS", a razão de ser um caminho ao invés de um diretório é para que uma revisão desconhecida do BIOS possa ser usada / testada.
 
-Alternatively, the region checking can be disabled in the console options tab. This is the only way to play unlicensed games or homebrew which does not supply a correct region string on the disc, aside from using fastboot which skips the check entirely.
+Como alternativa, a verificação da região pode ser desligada na guia de opções do console. Esta é a única maneira de jogar jogos não licenciados ou homebrews que não fornecem uma linha de região correta no disco, além de usar a inicialização rápida que ignora a verificação completamente.
 
-Mismatching the disc and console regions with the check disabled is supported, but may break games if they are patching the BIOS and expecting specific content.
+A verificação de discos incompativeis é suportada, mas pode interromper os jogos se eles estiverem sendo lidos pelo BIOS e esperando algum conteúdo específico.
 
-### LibCrypt protection and SBI files
+### Proteção LibCrypt e arquivos SBI
 
-A number of PAL region games use LibCrypt protection, requiring additional CD subchannel information to run properly. libcrypt not functioning usually manifests as hanging or crashing, but can sometimes affect gameplay too, depending on how the game implemented it.
+Vários jogos de região Européia usam proteção LibCrypt, exigindo informações adicionais do subcanal do CD para funcionar corretamente. Quando o libcrypt não funciona corretamente, é notável por travamentos, carregaemntos infinitos, mas às vezes também afetando a jogabilidade, dependendo de como o jogo o implementou.
 
-For these games, make sure that the CD image and its corresponding SBI (.sbi) file have the same name and are placed in the same directory. DuckStation will automatically load the SBI file when it is found next to the CD image.
+Para esses jogos, certifique-se de que a imagem do CD e seu respectivo arquivo SBI (.sbi) correspondente tenham o mesmo nome e sejam colocados no mesmo diretório. DuckStation irá carregar automaticamente o arquivo SBI quando ele for encontrado próximo à imagem do CD.
 
-For example, if your disc image was named `Spyro3.cue`, you would place the SBI file in the same directory, and name it `Spyro3.sbi`.
+Por exemplo, se a imagem do seu disco foi nomeada `Spyro3.cue`, você deve colocar o arquivo SBI no mesmo diretório, nomeando o meso assim: `Spyro3.sbi`.
 
-## Building
+## Construindo
 
 ### Windows
-Requirements:
+Requisitos:
  - Visual Studio 2019
  
-1. Clone the respository with submodules (`git clone --recursive https://github.com/stenzek/duckstation.git -b dev`).
-2. Open the Visual Studio solution `duckstation.sln` in the root, or "Open Folder" for cmake build.
-3. Build solution.
-4. Binaries are located in `bin/x64`.
-5. Run `duckstation-qt-x64-Release.exe` or whichever config you used.
+1. Clone o repositório com submódulos (`git clone --recursive https://github.com/stenzek/duckstation.git -b dev`).
+2. Abra o Visual Studio pelo arquivo `duckstation.sln` na raiz da pasta, ou "Abrir pasta" para compilar via cmake.
+3. Construia a solução.
+4. Os arquivos compilados estão localizados em `bin/x64`.
+5. Execute `duckstation-qt-x64-Release.exe` ou qualquer configuração que tenha usado.
 
 ### Linux
-Requirements (Debian/Ubuntu package names):
+Requisitos (Debian/Ubuntu):
  - CMake (`cmake`)
  - SDL2 (`libsdl2-dev`, `libxrandr-dev`)
  - pkgconfig (`pkg-config`)
  - Qt 5 (`qtbase5-dev`, `qtbase5-private-dev`, `qtbase5-dev-tools`, `qttools5-dev`)
  - libevdev (`libevdev-dev`)
- - git (`git`) (Note: needed to clone the repository and at build time)
- - When Wayland is enabled (default): `libwayland-dev` `libwayland-egl-backend-dev` `extra-cmake-modules`
- - Optional for RetroAchievements (on by default): libcurl (`libcurl4-gnutls-dev`)
- - Optional for framebuffer output: DRM/GBM (`libgbm-dev`, `libdrm-dev`)
- - Optional for faster building: Ninja (`ninja-build`)
+ - git (`git`) (Nota: necessário para clonar o repositório e em tempo de construção)
+ - Quando o wayland está ativado (padrão): `libwayland-dev` `libwayland-egl-backend-dev` `extra-cmake-modules`
+ - Opcional para RetroAchievements (ativado por padrão): libcurl (`libcurl4-gnutls-dev`)
+ - Opcional para saída do framebuffer: DRM/GBM (`libgbm-dev`, `libdrm-dev`)
+ - Opcional para construção rápida: Ninja (`ninja-build`)
 
-1. Clone the repository. Submodules aren't necessary, there is only one and it is only used for Windows (`git clone https://github.com/stenzek/duckstation.git -b dev`).
-2. Create a build directory, either in-tree or elsewhere.
-3. Run cmake to configure the build system. Assuming a build subdirectory of `build-release`, `cd build-release && cmake -DCMAKE_BUILD_TYPE=Release -GNinja ..`.
-4. Compile the source code. For the example above, run `ninja`.
-5. Run the binary, located in the build directory under `bin/duckstation-qt`.
+1. Clone o repositório. Submódulos não são necessários, há apenas um e é usado apenas para Windows     (`git clone https://github.com/stenzek/duckstation.git -b dev`).
+2. Crie um diretório de construção, em árvore ou em outro lugar.
+3. Execute cmake para configurar o sistema de compilação. Tendo em vista o subdiretório `build-release`, `cd build-release && cmake -DCMAKE_BUILD_TYPE=Release -GNinja ..`.
+4. Compile o código-fonte. Conforme informado acima, execute `ninja`.
+5. Execute o executável, localizado no diretório de compilação em `bin/duckstation-qt`.
 
 ### macOS
-**NOTE:** macOS is highly experimental and not tested by the developer. Use at your own risk, things may be horribly broken.
+**NOTE:** macOS é altamente experimental e não foi testado pelo desenvolvedor. Use por sua própria conta e risco, pode ser que quase nada funcione corretamente.
 
-Requirements:
- - CMake (installed by default? otherwise, `brew install cmake`)
+Requisitos:
+ - CMake (instalado por padrão? caso contrário, `brew install cmake`)
  - SDL2 (`brew install sdl2`)
  - Qt 5 (`brew install qt5`)
 
-1. Clone the repository. Submodules aren't necessary, there is only one and it is only used for Windows (`git clone https://github.com/stenzek/duckstation.git -b dev`).
-2. Clone the mac externals repository (for MoltenVK): `git clone https://github.com/stenzek/duckstation-ext-mac.git dep/mac`.
-2. Create a build directory, either in-tree or elsewhere, e.g. `mkdir build-release`, `cd build-release`.
-3. Run cmake to configure the build system: `cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_NOGUI_FRONTEND=OFF -DBUILD_QT_FRONTEND=ON -DUSE_SDL2=ON -DQt5_DIR=/usr/local/opt/qt@5/lib/cmake/Qt5 ..`. You may need to tweak `Qt5_DIR` depending on your system.
-4. Compile the source code: `make`. Use `make -jN` where `N` is the number of CPU cores in your system for a faster build.
-5. Run the binary, located in the build directory under `bin/DuckStation.app`.
+1. Clone o repositório. Submódulos não são necessários, há apenas um e é usado apenas para Windows    (`git clone https://github.com/stenzek/duckstation.git -b dev`).
+2. Clone o repositório externo do mac (autor: MoltenVK): `git clone https://github.com/stenzek/duckstation-ext-mac.git dep/mac`.
+2. Crie um diretório de construção, diretório em árvore ou em outro lugar, ex:. `mkdir build-release`, `cd build-release`.
+3. Execute cmake para configurar o sistema de compilação: `cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_NOGUI_FRONTEND=OFF -DBUILD_QT_FRONTEND=ON -DUSE_SDL2=ON -DQt5_DIR=/usr/local/opt/qt@5/lib/cmake/Qt5 ..`. Será necessário ajustar `Qt5_DIR` dependendo do sistema.
+4. Compile o código fonte: `make`. Use `make -jN` onde `N` é o número de núcleos de CPU em seu sistema para uma construção mais rápida.
+5. Execute o arquivo, localizado no diretório criado `bin/DuckStation.app`.
 
-## User Directories
-The "User Directory" is where you should place your BIOS images, where settings are saved to, and memory cards/save states are saved by default.
-An optional [SDL game controller database file](#sdl-game-controller-database) can be also placed here.
+## Diretório do usuário
+O "diretório do usuário" é onde você deve colocar as imagens do BIOS, onde as configurações são salvas e os cartões de memória / estados salvos são salvos por padrão.
+Uma opção [Banco de dados de controle de jogo SDL](#Banco-de-dados-de-controle-de-jogo-SDL) pode ser acrescentada ai.
 
-This is located in the following places depending on the platform you're using:
+Ele está localizado nos seguintes locais, dependendo da plataforma que você está usando:
 
-- Windows: My Documents\DuckStation
-- Linux: `$XDG_DATA_HOME/duckstation`, or `~/.local/share/duckstation`.
+- Windows: Meus documentos\DuckStation
+- Linux: `$XDG_DATA_HOME/duckstation`, ou `~/.local/share/duckstation`.
 - macOS: `~/Library/Application Support/DuckStation`.
 
-So, if you were using Linux, you would place your BIOS images in `~/.local/share/duckstation/bios`. This directory will be created upon running DuckStation
-for the first time.
+Então, se você estivesse usando Linux, você colocaria suas imagens de BIOS em `~/.local/share/duckstation/bios`. Este diretório será criado ao executar o DuckStation pela primeira vez.
 
-If you wish to use a "portable" build, where the user directory is the same as where the executable is located, create an empty file named `portable.txt`
-in the same directory as the DuckStation executable.
+Se você deseja usar uma versão "portátil", onde o diretório do usuário é o mesmo de onde o executável está localizado, crie um arquivo vazio chamado `portable.txt` no mesmo diretório que o executável do DuckStation.
 
-## Bindings for Qt frontend
-Your keyboard or game controller can be used to simulate a variety of PlayStation controllers. Controller input is supported through DInput, XInput, and SDL backends and can be changed through `Settings -> General Settings`.
+## Atribuições via interface QT
+Seu teclado ou controle pode ser usado para simular uma variedade de controles de PlayStation. A entrada do controle é suportada por meio da opção XInput, DInput e SDL e pode ser alterada da seguinte forma: `Configurações -> Configurações Gerais`.
 
-To bind your input device, go to `Settings -> Controller Settings`. Each of the buttons/axes for the simulated controller will be listed, alongside the corresponding key/button on your device that it is currently bound to. To rebind, click the box next to the button/axis name, and press the key or button on your input device that you wish to bind to. When binding rumble, simply press any button on the controller you wish to send rumble to.
+Para atribuir o seu dispositivo, vá até `Configurações -> Configurações de controles`. Cada um dos botões / eixos do controle simulado será listado, correspondente no dispositivo ao qual está vinculado no momento. Para religar, clique na caixa ao lado do botão / nome do eixo e pressione a tecla ou botão no dispositivo de entrada que deseja vincular. Para vincular o 'rumble' vibração, basta pressionar qualquer botão no controle para o qual deseja atribuir a função rumble ou vibração.
 
-## SDL Game Controller Database
-DuckStation releases ship with a database of game controller mappings for the SDL controller backend, courtesy of https://github.com/gabomdq/SDL_GameControllerDB. The included `gamecontrollerdb.txt` file can be found in the `database` subdirectory of the DuckStation program directory.
+## Banco de dados de controle de jogo SDL
+As versões do DuckStation vêm com um banco de dados de mapeamentos de controles com a opção de controle SDL, cortesia de: https://github.com/gabomdq/SDL_GameControllerDB. O arquivo `gamecontrollerdb.txt` pode ser encontrado na pasta `database` dentro do diretório do emulador.
 
-If you are experiencing issues binding your controller with the SDL controller backend, you may need to add a custom mapping to the database file. Make a copy of `gamecontrollerdb.txt` and place it in your [user directory](#user-directories) (or directly in the program directory, if running in portable mode) and then follow the instructions in the [SDL_GameControllerDB repository](https://github.com/gabomdq/SDL_GameControllerDB) for creating a new mapping. Add this mapping to the new copy of `gamecontrollerdb.txt` and your controller should then be recognized properly.
+Se você estiver tendo problemas para vincular seu controle com a opção SDL, pode ser necessário adicionar um vínculo personalizado ao arquivo de banco de dados. Faça uma cópia do `gamecontrollerdb.txt` e coloque em seu [diretório de usuário](#Diretório-do-usuário) (ou diretamente no diretório do programa, se estiver executando em modo portátil) e siga as instruções em [SDL_GameControllerDB repositório](https://github.com/gabomdq/SDL_GameControllerDB) para criar um novo mapeamento. Adicione a entrada para este mapeamento em `gamecontrollerdb.txt` e seu controle deverá ser reconhecido corretamente.
 
-## Default bindings
-Controller 1:
+## Atribuições padrão
+Controle 1:
  - **D-Pad:** W/A/S/D
- - **Triangle/Square/Circle/Cross:** Numpad8/Numpad4/Numpad6/Numpad2
+ - **Triangulo/Quadrado/Círculo/Cruz:** Numpad8/Numpad4/Numpad6/Numpad2
  - **L1/R1:** Q/E
  - **L2/R2:** 1/3
  - **Start:** Enter
  - **Select:** Backspace
 
-Hotkeys:
- - **Escape:** Power off console
- - **ALT+ENTER:** Toggle fullscreen
- - **Tab:** Temporarily disable speed limiter
- - **Space:** Pause/resume emulation
+Atalhos:
+ - **Esc:** Desliga o console
+ - **ALT+ENTER:** Alterna modo tela-cheia
+ - **Tab:** Desativar temporariamente o limitador de velocidade
+ - **Barra de espaço:** Pausa/resume a emulação
  
 ## Tests
  - Passes amidog's CPU and GTE tests in both interpreter and recompiler modes, partial passing of CPX tests
 
-## Screenshots
+## Capturas de tela
 <p align="center">
   <a href="https://raw.githubusercontent.com/stenzek/duckstation/md-images/monkey.jpg"><img src="https://raw.githubusercontent.com/stenzek/duckstation/md-images/monkey.jpg" alt="Monkey Hero" width="400" /></a>
   <a href="https://raw.githubusercontent.com/stenzek/duckstation/md-images/rrt4.jpg"><img src="https://raw.githubusercontent.com/stenzek/duckstation/md-images/rrt4.jpg" alt="Ridge Racer Type 4" width="400" /></a>
@@ -283,10 +283,9 @@ Hotkeys:
   <a href="https://raw.githubusercontent.com/stenzek/duckstation/md-images/gamegrid.png"><img src="https://raw.githubusercontent.com/stenzek/duckstation/md-images/gamegrid.png" alt="Game Grid" width="400" /></a>
 </p>
 
-## Disclaimers
+## Avisos
 
-Icon by icons8: https://icons8.com/icon/74847/platforms.undefined.short-title
+Ícone feito icons8: https://icons8.com/icon/74847/platforms.undefined.short-title
 
-"PlayStation" and "PSX" are registered trademarks of Sony Interactive Entertainment Europe Limited. This project is not affiliated in any way with Sony Interactive Entertainment.
-
-
+"PlayStation" e "PSX" são marcas registradas da Sony Interactive Entertainment Europe Limited. 
+Este projeto não é afiliado de forma alguma com a Sony Interactive Entertainment.
