@@ -174,10 +174,10 @@ bool GameList::GetGameListEntry(const std::string& path, GameListEntry* entry)
     entry->publisher = std::move(dbentry.publisher);
     entry->developer = std::move(dbentry.developer);
     entry->release_date = dbentry.release_date;
-    entry->min_players = dbentry.min_players;
-    entry->max_players = dbentry.max_players;
-    entry->min_blocks = dbentry.min_blocks;
-    entry->max_blocks = dbentry.max_blocks;
+    entry->min_players = static_cast<u8>(dbentry.min_players);
+    entry->max_players = static_cast<u8>(dbentry.max_players);
+    entry->min_blocks = static_cast<u8>(dbentry.min_blocks);
+    entry->max_blocks = static_cast<u8>(dbentry.max_blocks);
     entry->supported_controllers = dbentry.supported_controllers_mask;
   }
 
@@ -480,7 +480,7 @@ void GameList::ScanDirectory(const char* path, bool recursive, ProgressCallback*
   {
     progress->IncrementProgressValue();
 
-    if (!IsScannableFilename(ffd.FileName) || GetEntryForPath(ffd.FileName.c_str()))
+    if (!IsScannableFilename(ffd.FileName) || IsPathExcluded(ffd.FileName) || GetEntryForPath(ffd.FileName.c_str()))
       continue;
 
     const u64 modified_time = ffd.ModificationTime.AsUnixTimestamp();
@@ -592,9 +592,15 @@ bool GameList::GetDatabaseEntryForDisc(CDImage* image, GameDatabaseEntry* entry)
   return m_database.GetEntryForDisc(image, entry);
 }
 
+bool GameList::IsPathExcluded(const std::string& path) const
+{
+  return (std::find(m_excluded_paths.begin(), m_excluded_paths.end(), path) != m_excluded_paths.end());
+}
+
 void GameList::SetSearchDirectoriesFromSettings(SettingsInterface& si)
 {
   m_search_directories.clear();
+  m_excluded_paths = si.GetStringList("GameList", "ExcludedPaths");
 
   std::vector<std::string> dirs = si.GetStringList("GameList", "Paths");
   for (std::string& dir : dirs)

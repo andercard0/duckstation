@@ -19,7 +19,7 @@
 #include <sys/sysctl.h>
 #endif
 
-#if defined(WIN32)
+#if defined(_WIN32)
 #include <shlobj.h>
 #else
 #include <dirent.h>
@@ -573,7 +573,7 @@ void SanitizeFileName(std::string& Destination, bool StripSlashes /* = true*/)
 
 bool IsAbsolutePath(const std::string_view& path)
 {
-#ifdef WIN32
+#ifdef _WIN32
   return (path.length() >= 3 && ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) &&
           path[1] == ':' && (path[2] == '/' || path[2] == '\\'));
 #else
@@ -713,7 +713,7 @@ std::vector<std::string> GetRootDirectoryList()
 {
   std::vector<std::string> results;
 
-#ifdef WIN32
+#ifdef _WIN32
   char buf[256];
   if (GetLogicalDriveStringsA(sizeof(buf), buf) != 0)
   {
@@ -774,7 +774,7 @@ FileSystem::ManagedCFilePtr OpenManagedCFile(const char* filename, const char* m
 
 std::FILE* OpenCFile(const char* filename, const char* mode)
 {
-#ifdef WIN32
+#ifdef _WIN32
   int filename_len = static_cast<int>(std::strlen(filename));
   int mode_len = static_cast<int>(std::strlen(mode));
   int wlen = MultiByteToWideChar(CP_UTF8, 0, filename, filename_len, nullptr, 0);
@@ -1571,6 +1571,20 @@ bool FileSystem::DeleteFile(const char* Path)
     return false;
 }
 
+bool FileSystem::RenamePath(const char* OldPath, const char* NewPath)
+{
+  const std::wstring old_wpath(StringUtil::UTF8StringToWideString(OldPath));
+  const std::wstring new_wpath(StringUtil::UTF8StringToWideString(NewPath));
+
+  if (!MoveFileExW(old_wpath.c_str(), new_wpath.c_str(), MOVEFILE_REPLACE_EXISTING))
+  {
+    Log_ErrorPrintf("MoveFileEx('%s', '%s') failed: %08X", OldPath, NewPath, GetLastError());
+    return false;
+  }
+
+  return true;
+}
+
 static bool RecursiveDeleteDirectory(const std::wstring& wpath, bool Recursive)
 {
   // ensure it exists
@@ -2044,6 +2058,20 @@ bool DeleteFile(const char* Path)
     return false;
 
   return (unlink(Path) == 0);
+}
+
+bool RenamePath(const char* OldPath, const char* NewPath)
+{
+  if (OldPath[0] == '\0' || NewPath[0] == '\0')
+    return false;
+
+  if (rename(OldPath, NewPath) != 0)
+  {
+    Log_ErrorPrintf("rename('%s', '%s') failed: %d", OldPath, NewPath, errno);
+    return false;
+  }
+
+  return true;
 }
 
 bool DeleteDirectory(const char* Path, bool Recursive)

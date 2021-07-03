@@ -64,6 +64,8 @@ public:
   void SetFloatSettingValue(const char* section, const char* key, float value);
   void SetStringSettingValue(const char* section, const char* key, const char* value);
   void SetStringListSettingValue(const char* section, const char* key, const std::vector<std::string>& values);
+  bool AddValueToStringList(const char* section, const char* key, const char* value);
+  bool RemoveValueFromStringList(const char* section, const char* key, const char* value);
   void RemoveSettingValue(const char* section, const char* key);
 
   TinyString TranslateString(const char* context, const char* str, const char* disambiguation = nullptr,
@@ -163,6 +165,7 @@ public Q_SLOTS:
   void loadState(bool global, qint32 slot);
   void saveState(const QString& filename, bool block_until_done = false);
   void saveState(bool global, qint32 slot, bool block_until_done = false);
+  void undoLoadState();
   void setAudioOutputVolume(int volume, int fast_forward_volume);
   void setAudioOutputMuted(bool muted);
   void startDumpingAudio();

@@ -51,12 +51,20 @@
 #include "cheevos.h"
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 #include "common/windows_headers.h"
 #include <KnownFolders.h>
 #include <ShlObj.h>
 #include <mmsystem.h>
 #endif
+
+namespace FrontendCommon {
+
+#ifdef _WIN32
+std::unique_ptr<AudioStream> CreateXAudio2AudioStream();
+#endif
+
+} // namespace FrontendCommon
 
 Log_SetChannel(CommonHostInterface);
 
@@ -207,6 +215,7 @@ bool CommonHostInterface::BootSystem(std::shared_ptr<SystemBootParameters> param
 
 void CommonHostInterface::DestroySystem()
 {
+  m_undo_load_state.reset();
   SetTimerResolutionIncreased(false);
   m_save_state_selector_ui->Close();
   m_display->SetPostProcessingChain({});
@@ -532,6 +541,7 @@ bool CommonHostInterface::CreateHostDisplayResources()
   ImGui::GetIO().DisplaySize.x = static_cast<float>(m_display->GetWindowWidth());
   ImGui::GetIO().DisplaySize.y = static_cast<float>(m_display->GetWindowHeight());
   ImGui::GetStyle() = ImGuiStyle();
+  ImGui::GetStyle().WindowMinSize = ImVec2(1.0f, 1.0f);
   ImGui::StyleColorsDarker();
   ImGui::GetStyle().ScaleAllSizes(framebuffer_scale);
 
@@ -595,6 +605,7 @@ void CommonHostInterface::OnHostDisplayResized()
   {
     ImGui::GetIO().DisplayFramebufferScale = ImVec2(new_scale, new_scale);
     ImGui::GetStyle() = ImGuiStyle();
+    ImGui::GetStyle().WindowMinSize = ImVec2(1.0f, 1.0f);
     ImGui::StyleColorsDarker();
     ImGui::GetStyle().ScaleAllSizes(new_scale);
     ImGuiFullscreen::ResetFonts();
@@ -627,6 +638,11 @@ std::unique_ptr<AudioStream> CommonHostInterface::CreateAudioStream(AudioBackend
 
     case AudioBackend::Cubeb:
       return CubebAudioStream::Create();
+
+#ifdef _WIN32
+    case AudioBackend::XAudio2:
+      return FrontendCommon::CreateXAudio2AudioStream();
+#endif
 
 #ifdef WITH_SDL2
     case AudioBackend::SDL:
@@ -685,9 +701,57 @@ void CommonHostInterface::UpdateControllerInterface()
   }
 }
 
+bool CommonHostInterface::UndoLoadState()
+{
+  if (!m_undo_load_state)
+    return false;
+
+  Assert(System::IsValid());
+
+  m_undo_load_state->SeekAbsolute(0);
+  if (!System::LoadState(m_undo_load_state.get()))
+  {
+    ReportError("Failed to load undo state, resetting system.");
+    m_undo_load_state.reset();
+    ResetSystem();
+    return false;
+  }
+
+  System::ResetPerformanceCounters();
+  System::ResetThrottler();
+
+#ifdef WITH_CHEEVOS
+  Cheevos::Reset();
+#endif
+
+  Log_InfoPrintf("Loaded undo save state.");
+  m_undo_load_state.reset();
+  return true;
+}
+
+bool CommonHostInterface::SaveUndoLoadState()
+{
+  if (m_undo_load_state)
+    m_undo_load_state.reset();
+
+  m_undo_load_state = ByteStream_CreateGrowableMemoryStream(nullptr, System::MAX_SAVE_STATE_SIZE);
+  if (!System::SaveState(m_undo_load_state.get(), 0))
+  {
+    AddOSDMessage(TranslateStdString("OSDMessage", "Failed to save undo load state."), 15.0f);
+    m_undo_load_state.reset();
+    return false;
+  }
+
+  Log_InfoPrintf("Saved undo load state: % " PRIu64 " bytes", m_undo_load_state->GetSize());
+  return true;
+}
+
 bool CommonHostInterface::LoadState(const char* filename)
 {
   const bool system_was_valid = System::IsValid();
+  if (system_was_valid)
+    SaveUndoLoadState();
+
   const bool result = HostInterface::LoadState(filename);
   if (system_was_valid || !result)
   {
@@ -695,6 +759,9 @@ bool CommonHostInterface::LoadState(const char* filename)
     Cheevos::Reset();
 #endif
   }
+
+  if (!result && CanUndoLoadState())
+    UndoLoadState();
 
   return result;
 }
@@ -722,6 +789,7 @@ bool CommonHostInterface::SaveState(bool global, s32 slot)
   }
 
   std::string save_path = global ? GetGlobalSaveStateFileName(slot) : GetGameSaveStateFileName(code.c_str(), slot);
+  RenameCurrentSaveStateToBackup(save_path.c_str());
   if (!SaveState(save_path.c_str()))
     return false;
 
@@ -836,7 +904,7 @@ void CommonHostInterface::UpdateSpeedLimiterState()
     !System::IsRunning() || (m_throttler_enabled && g_settings.audio_sync_enabled && !is_non_standard_speed);
   const bool video_sync_enabled =
     !System::IsRunning() || (m_throttler_enabled && g_settings.video_sync_enabled && !is_non_standard_speed);
-  const float max_display_fps = (!System::IsValid() || m_throttler_enabled) ? 0.0f : g_settings.display_max_fps;
+  const float max_display_fps = (!System::IsRunning() || m_throttler_enabled) ? 0.0f : g_settings.display_max_fps;
   Log_InfoPrintf("Target speed: %f%%", target_speed * 100.0f);
   Log_InfoPrintf("Syncing to %s%s", audio_sync_enabled ? "audio" : "",
                  (audio_sync_enabled && video_sync_enabled) ? " and video" : (video_sync_enabled ? "video" : ""));
@@ -926,7 +994,7 @@ void CommonHostInterface::SetUserDirectory()
   }
   else
   {
-#if defined(WIN32)
+#if defined(_WIN32)
     // On Windows, use My Documents\DuckStation.
     PWSTR documents_directory;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, NULL, &documents_directory)))
@@ -1846,26 +1914,50 @@ bool CommonHostInterface::AddAxisToInputMap(const std::string& binding, const st
         StringUtil::FromChars<int>(axis.substr(axis[0] == '+' || axis[0] == '-' ? 5 : 4));
       if (axis_index)
       {
+        const bool inverted = StringUtil::EndsWith(axis, "-");
         ControllerInterface::AxisSide axis_side = ControllerInterface::AxisSide::Full;
         if (axis[0] == '+')
-          axis_side = ControllerInterface::AxisSide::Positive;
-        else if (axis[0] == '-')
-          axis_side = ControllerInterface::AxisSide::Negative;
-
-        const bool inverted = StringUtil::EndsWith(axis, "-");
-        if (!inverted)
         {
-          if (m_controller_interface->BindControllerAxis(*controller_index, *axis_index, axis_side, std::move(handler)))
+          axis_side = ControllerInterface::AxisSide::Positive;
+        }
+        else if (axis[0] == '-')
+        {
+          axis_side = ControllerInterface::AxisSide::Negative;
+        }
+
+        if (axis_type == Controller::AxisType::Half && axis_side == ControllerInterface::Full)
+        {
+          // full axis [-1..1] -> half axis [0..1]
+          if (inverted)
           {
-            return true;
+            m_controller_interface->BindControllerAxis(
+              *controller_index, *axis_index, axis_side,
+              [cb = std::move(handler)](float value) { cb(((-value) + 1.0f) * 0.5f); });
+          }
+          else
+          {
+            m_controller_interface->BindControllerAxis(
+              *controller_index, *axis_index, axis_side,
+              [cb = std::move(handler)](float value) { cb((value + 1.0f) * 0.5f); });
           }
         }
         else
         {
-          if (m_controller_interface->BindControllerAxis(*controller_index, *axis_index, axis_side,
-                                                         [cb = std::move(handler)](float value) { cb(-value); }))
+          if (!inverted)
           {
-            return true;
+            if (m_controller_interface->BindControllerAxis(*controller_index, *axis_index, axis_side,
+                                                           std::move(handler)))
+            {
+              return true;
+            }
+          }
+          else
+          {
+            if (m_controller_interface->BindControllerAxis(*controller_index, *axis_index, axis_side,
+                                                           [cb = std::move(handler)](float value) { cb(-value); }))
+            {
+              return true;
+            }
           }
         }
       }
@@ -2049,7 +2141,7 @@ void CommonHostInterface::RegisterGeneralHotkeys()
                      }
                    }
                  });
-#endif  // !defined(__ANDROID__) && defined(WITH_CHEEVOS)
+#endif // !defined(__ANDROID__) && defined(WITH_CHEEVOS)
 }
 
 void CommonHostInterface::RegisterSystemHotkeys()
@@ -2303,6 +2395,12 @@ void CommonHostInterface::RegisterSaveStateHotkeys()
                  StaticString(TRANSLATABLE("Hotkeys", "Select Next Save Slot")), [this](bool pressed) {
                    if (pressed)
                      m_save_state_selector_ui->SelectNextSlot();
+                 });
+
+  RegisterHotkey(StaticString(TRANSLATABLE("Hotkeys", "Save States")), StaticString("UndoLoadState"),
+                 StaticString(TRANSLATABLE("Hotkeys", "Undo Load State")), [this](bool pressed) {
+                   if (pressed)
+                     UndoLoadState();
                  });
 
   for (u32 slot = 1; slot <= PER_GAME_SAVE_STATE_SLOTS; slot++)
@@ -2670,6 +2768,24 @@ std::string CommonHostInterface::GetGlobalSaveStateFileName(s32 slot) const
     return GetUserDirectoryRelativePath("savestates" FS_OSPATH_SEPARATOR_STR "resume.sav");
   else
     return GetUserDirectoryRelativePath("savestates" FS_OSPATH_SEPARATOR_STR "savestate_%d.sav", slot);
+}
+
+void CommonHostInterface::RenameCurrentSaveStateToBackup(const char* filename)
+{
+  if (!GetBoolSettingValue("General", "CreateSaveStateBackups", false))
+    return;
+
+  if (!FileSystem::FileExists(filename))
+    return;
+
+  const std::string backup_filename(FileSystem::ReplaceExtension(filename, "bak"));
+  if (!FileSystem::RenamePath(filename, backup_filename.c_str()))
+  {
+    Log_ErrorPrintf("Failed to rename save state backup '%s'", backup_filename.c_str());
+    return;
+  }
+
+  Log_InfoPrintf("Renamed save state '%s' to '%s'", filename, backup_filename.c_str());
 }
 
 std::vector<CommonHostInterface::SaveStateInfo> CommonHostInterface::GetAvailableSaveStates(const char* game_code) const
@@ -3092,7 +3208,7 @@ void CommonHostInterface::SetTimerResolutionIncreased(bool enabled)
 
   m_timer_resolution_increased = enabled;
 
-#ifdef WIN32
+#ifdef _WIN32
   if (enabled)
     timeBeginPeriod(1);
   else

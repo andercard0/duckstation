@@ -9,7 +9,7 @@
 
 class ByteStream;
 
-#ifdef WIN32
+#ifdef _WIN32
 #define FS_OSPATH_SEPARATOR_CHARACTER '\\'
 #define FS_OSPATH_SEPARATOR_STR "\\"
 #else
@@ -181,6 +181,9 @@ bool DirectoryExists(const char* Path);
 
 // delete file
 bool DeleteFile(const char* Path);
+
+// rename file
+bool RenamePath(const char* OldPath, const char* NewPath);
 
 // open files
 std::unique_ptr<ByteStream> OpenFile(const char* FileName, u32 Flags);

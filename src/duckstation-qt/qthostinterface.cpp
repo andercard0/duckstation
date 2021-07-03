@@ -39,7 +39,7 @@
 #include <memory>
 Log_SetChannel(QtHostInterface);
 
-#ifdef WIN32
+#ifdef _WIN32
 #include "common/windows_headers.h"
 #include "frontend-common/d3d11_host_display.h"
 #include <KnownFolders.h>
@@ -234,6 +234,26 @@ void QtHostInterface::SetStringListSettingValue(const char* section, const char*
   std::lock_guard<std::recursive_mutex> guard(m_settings_mutex);
   m_settings_interface->SetStringList(section, key, values);
   queueSettingsSave();
+}
+
+bool QtHostInterface::AddValueToStringList(const char* section, const char* key, const char* value)
+{
+  std::lock_guard<std::recursive_mutex> guard(m_settings_mutex);
+  if (!m_settings_interface->AddToStringList(section, key, value))
+    return false;
+
+  queueSettingsSave();
+  return true;
+}
+
+bool QtHostInterface::RemoveValueFromStringList(const char* section, const char* key, const char* value)
+{
+  std::lock_guard<std::recursive_mutex> guard(m_settings_mutex);
+  if (!m_settings_interface->RemoveFromStringList(section, key, value))
+    return false;
+
+  queueSettingsSave();
+  return true;
 }
 
 void QtHostInterface::RemoveSettingValue(const char* section, const char* key)
@@ -570,13 +590,13 @@ HostDisplay* QtHostInterface::createHostDisplay()
       break;
 
     case GPURenderer::HardwareOpenGL:
-#ifndef WIN32
+#ifndef _WIN32
     default:
 #endif
       m_display = std::make_unique<FrontendCommon::OpenGLHostDisplay>();
       break;
 
-#ifdef WIN32
+#ifdef _WIN32
     case GPURenderer::HardwareD3D11:
     default:
       m_display = std::make_unique<FrontendCommon::D3D11HostDisplay>();
@@ -973,6 +993,9 @@ void QtHostInterface::populateSaveStateMenus(const char* game_code, QMenu* load_
 
     loadState(path);
   });
+  QAction* load_from_state = load_menu->addAction(tr("Undo Load State"));
+  load_from_state->setEnabled(CanUndoLoadState());
+  connect(load_from_state, &QAction::triggered, this, &QtHostInterface::undoLoadState);
   load_menu->addSeparator();
 
   connect(save_menu->addAction(tr("Save To File...")), &QAction::triggered, [this]() {
@@ -1321,6 +1344,17 @@ void QtHostInterface::saveState(bool global, qint32 slot, bool block_until_done 
     SaveState(global, slot);
 }
 
+void QtHostInterface::undoLoadState()
+{
+  if (!isOnWorkerThread())
+  {
+    QMetaObject::invokeMethod(this, "undoLoadState", Qt::QueuedConnection);
+    return;
+  }
+
+  UndoLoadState();
+}
+
 void QtHostInterface::setAudioOutputVolume(int volume, int fast_forward_volume)
 {
   if (!isOnWorkerThread())
@@ -1616,7 +1650,7 @@ void QtHostInterface::wakeThread()
 
 static std::string GetFontPath(const char* name)
 {
-#ifdef WIN32
+#ifdef _WIN32
   PWSTR folder_path;
   if (FAILED(SHGetKnownFolderPath(FOLDERID_Fonts, 0, nullptr, &folder_path)))
     return StringUtil::StdStringFromFormat("C:\\Windows\\Fonts\\%s", name);
@@ -1637,7 +1671,7 @@ void QtHostInterface::setImGuiFont()
 
   std::string path;
   const ImWchar* range = nullptr;
-#ifdef WIN32
+#ifdef _WIN32
   if (language == "ja")
   {
     path = GetFontPath("msgothic.ttc");

@@ -109,7 +109,7 @@ static constexpr std::array<const char*, static_cast<u32>(ControllerInterface::B
 #ifdef WITH_SDL2
   TRANSLATABLE("ControllerInterface", "SDL"),
 #endif
-#ifdef WIN32
+#ifdef _WIN32
   TRANSLATABLE("ControllerInterface", "XInput"),
   TRANSLATABLE("ControllerInterface", "DInput"),
 #endif
@@ -142,18 +142,19 @@ ControllerInterface::Backend ControllerInterface::GetDefaultBackend()
 {
 #ifdef WITH_SDL2
   return Backend::SDL;
-#endif
-#ifdef WIN32
+#else
+#ifdef _WIN32
   return Backend::XInput;
 #else
   return Backend::None;
+#endif
 #endif
 }
 
 #ifdef WITH_SDL2
 #include "sdl_controller_interface.h"
 #endif
-#ifdef WIN32
+#ifdef _WIN32
 #include "dinput_controller_interface.h"
 #include "xinput_controller_interface.h"
 #endif
@@ -167,7 +168,7 @@ std::unique_ptr<ControllerInterface> ControllerInterface::Create(Backend type)
   if (type == Backend::SDL)
     return std::make_unique<SDLControllerInterface>();
 #endif
-#ifdef WIN32
+#ifdef _WIN32
   if (type == Backend::XInput)
     return std::make_unique<XInputControllerInterface>();
   if (type == Backend::DInput)

@@ -155,6 +155,9 @@ public:
   /// Returns true if the fullscreen UI is enabled.
   ALWAYS_INLINE bool IsFullscreenUIEnabled() const { return m_fullscreen_ui_enabled; }
 
+  /// Returns true if an undo load state exists.
+  ALWAYS_INLINE bool CanUndoLoadState() const { return static_cast<bool>(m_undo_load_state); }
+
   /// Parses command line parameters for all frontends.
   bool ParseCommandLineParameters(int argc, char* argv[], std::unique_ptr<SystemBootParameters>* out_boot_params);
 
@@ -175,6 +178,9 @@ public:
 
   /// Powers off the system, optionally saving the resume state.
   void PowerOffSystem(bool save_resume_state);
+
+  /// Undoes a load state, i.e. restores the state prior to the load.
+  bool UndoLoadState();
 
   /// Loads state from the specified filename.
   bool LoadState(const char* filename);
@@ -352,6 +358,9 @@ protected:
   /// Executes per-frame tasks such as controller polling.
   virtual void PollAndUpdate();
 
+  /// Saves the undo load state, so it can be restored.
+  bool SaveUndoLoadState();
+
   virtual std::unique_ptr<AudioStream> CreateAudioStream(AudioBackend backend) override;
   virtual s32 GetAudioOutputVolume() const override;
   virtual void UpdateControllerInterface();
@@ -394,6 +403,9 @@ protected:
 
   /// Returns the path to a save state file. Specifying an index of -1 is the "resume" save state.
   std::string GetGlobalSaveStateFileName(s32 slot) const;
+
+  /// Moves the current save state file to a backup name, if it exists.
+  void RenameCurrentSaveStateToBackup(const char* filename);
 
   /// Sets the base path for the user directory. Can be overridden by platform/frontend/command line.
   virtual void SetUserDirectory();
@@ -547,6 +559,9 @@ private:
     bool state;
   };
   std::vector<ControllerAutoFireState> m_controller_autofires;
+
+  // temporary save state, created when loading, used to undo load state
+  std::unique_ptr<ByteStream> m_undo_load_state;
 
 #ifdef WITH_DISCORD_PRESENCE
   // discord rich presence

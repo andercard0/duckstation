@@ -1605,6 +1605,16 @@ bool CodeGenerator::Compile_LoadLeftRight(const CodeBlockInstruction& cbi)
   }
   else
   {
+    // if this is the first instruction in the block, we need to stall until the load finishes
+    // we don't actually care if it's our target reg or not, if it's not, it won't affect anything
+    if (m_load_delay_dirty)
+    {
+      Log_DevPrintf("Flushing interpreter load delay for lwl/lwr instruction at 0x%08X", cbi.pc);
+      EmitFlushInterpreterLoadDelay();
+      m_register_cache.InvalidateGuestRegister(cbi.instruction.r.rt);
+      m_load_delay_dirty = false;
+    }
+
     value = m_register_cache.ReadGuestRegister(cbi.instruction.i.rt, true, true);
   }
 
@@ -1864,7 +1874,10 @@ bool CodeGenerator::Compile_Multiply(const CodeBlockInstruction& cbi)
   Value rs = m_register_cache.ReadGuestRegister(cbi.instruction.r.rs);
   Value rt = m_register_cache.ReadGuestRegister(cbi.instruction.r.rt);
   if (g_settings.UsingPGXPCPUMode())
-    EmitFunctionCall(nullptr, signed_multiply ? &PGXP::CPU_MULT : &PGXP::CPU_MULTU, rs, rt);
+  {
+    EmitFunctionCall(nullptr, signed_multiply ? &PGXP::CPU_MULT : &PGXP::CPU_MULTU,
+                     Value::FromConstantU32(cbi.instruction.bits), rs, rt);
+  }
 
   std::pair<Value, Value> result = MulValues(rs, rt, signed_multiply);
   rs.ReleaseAndClear();
@@ -1927,7 +1940,7 @@ bool CodeGenerator::Compile_Divide(const CodeBlockInstruction& cbi)
   Value denom = m_register_cache.ReadGuestRegister(cbi.instruction.r.rt);
 
   if (g_settings.UsingPGXPCPUMode())
-    EmitFunctionCall(nullptr, &PGXP::CPU_DIV, num, denom);
+    EmitFunctionCall(nullptr, &PGXP::CPU_DIV, Value::FromConstantU32(cbi.instruction.bits), num, denom);
 
   if (num.IsConstant() && denom.IsConstant())
   {
@@ -1988,7 +2001,7 @@ bool CodeGenerator::Compile_SignedDivide(const CodeBlockInstruction& cbi)
   Value denom = m_register_cache.ReadGuestRegister(cbi.instruction.r.rt);
 
   if (g_settings.UsingPGXPCPUMode())
-    EmitFunctionCall(nullptr, &PGXP::CPU_DIVU, num, denom);
+    EmitFunctionCall(nullptr, &PGXP::CPU_DIV, Value::FromConstantU32(cbi.instruction.bits), num, denom);
 
   if (num.IsConstant() && denom.IsConstant())
   {

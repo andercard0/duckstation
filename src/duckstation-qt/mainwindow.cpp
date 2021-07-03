@@ -693,6 +693,9 @@ void MainWindow::onGameListContextMenuRequested(const QPoint& point, const GameL
     menu.addSeparator();
   }
 
+  connect(menu.addAction(tr("Exclude From List")), &QAction::triggered,
+          [this, entry]() { getSettingsDialog()->getGameListSettingsWidget()->addExcludedPath(entry->path); });
+
   connect(menu.addAction(tr("Add Search Directory...")), &QAction::triggered,
           [this]() { getSettingsDialog()->getGameListSettingsWidget()->addSearchDirectory(this); });
 
@@ -1626,7 +1629,7 @@ void MainWindow::checkForUpdates(bool display_message)
       mbox.setTextFormat(Qt::RichText);
 
       QString message;
-#ifdef WIN32
+#ifdef _WIN32
       message =
         tr("<p>Sorry, you are trying to update a DuckStation version which is not an official GitHub release. To "
            "prevent incompatibilities, the auto-updater is only enabled on official builds.</p>"

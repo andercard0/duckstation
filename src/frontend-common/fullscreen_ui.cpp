@@ -53,6 +53,7 @@ using ImGuiFullscreen::BeginFullscreenColumns;
 using ImGuiFullscreen::BeginFullscreenColumnWindow;
 using ImGuiFullscreen::BeginFullscreenWindow;
 using ImGuiFullscreen::BeginMenuButtons;
+using ImGuiFullscreen::BeginNavBar;
 using ImGuiFullscreen::CloseChoiceDialog;
 using ImGuiFullscreen::CloseFileSelector;
 using ImGuiFullscreen::DPIScale;
@@ -60,6 +61,7 @@ using ImGuiFullscreen::EndFullscreenColumns;
 using ImGuiFullscreen::EndFullscreenColumnWindow;
 using ImGuiFullscreen::EndFullscreenWindow;
 using ImGuiFullscreen::EndMenuButtons;
+using ImGuiFullscreen::EndNavBar;
 using ImGuiFullscreen::EnumChoiceButton;
 using ImGuiFullscreen::FloatingButton;
 using ImGuiFullscreen::LayoutScale;
@@ -69,9 +71,12 @@ using ImGuiFullscreen::MenuButtonWithValue;
 using ImGuiFullscreen::MenuHeading;
 using ImGuiFullscreen::MenuHeadingButton;
 using ImGuiFullscreen::MenuImageButton;
+using ImGuiFullscreen::NavButton;
+using ImGuiFullscreen::NavTitle;
 using ImGuiFullscreen::OpenChoiceDialog;
 using ImGuiFullscreen::OpenFileSelector;
 using ImGuiFullscreen::RangeButton;
+using ImGuiFullscreen::RightAlignNavButtons;
 using ImGuiFullscreen::ToggleButton;
 
 namespace FullscreenUI {
@@ -145,6 +150,7 @@ enum class InputBindingType
   None,
   Button,
   Axis,
+  HalfAxis,
   Rumble
 };
 
@@ -654,7 +660,7 @@ static void DoCheatsMenu()
   CheatList* cl = System::GetCheatList();
   if (!cl)
   {
-    if (!s_host_interface->LoadCheatListFromDatabase() || !(cl = System::GetCheatList()))
+    if (!s_host_interface->LoadCheatListFromDatabase() || ((cl = System::GetCheatList()) == nullptr))
     {
       s_host_interface->AddFormattedOSDMessage(10.0f, "No cheats found for %s.", System::GetRunningTitle().c_str());
       ReturnToMainWindow();
@@ -881,6 +887,9 @@ static void DrawInputBindingButton(InputBindingType type, const char* section, c
       case InputBindingType::Axis:
         title.Format(ICON_FA_BULLSEYE "  %s Axis", display_name);
         break;
+      case InputBindingType::HalfAxis:
+        title.Format(ICON_FA_SLIDERS_H "  %s Half-Axis", display_name);
+        break;
       case InputBindingType::Rumble:
         title.Format(ICON_FA_BELL "  %s", display_name);
         break;
@@ -972,6 +981,16 @@ void BeginInputBinding(InputBindingType type, const std::string_view& section, c
         {
           if (hook.type == ControllerInterface::Hook::Type::Axis)
             value.Format("Controller%d/Axis%d", hook.controller_index, hook.button_or_axis_number);
+        }
+        break;
+
+        case InputBindingType::HalfAxis:
+        {
+          if (hook.type == ControllerInterface::Hook::Type::Axis)
+          {
+            value.Format("Controller%d/%cAxis%d", hook.controller_index,
+                         (std::get<float>(hook.value) < 0.0f) ? '-' : '+', hook.button_or_axis_number);
+          }
         }
         break;
 
@@ -1274,36 +1293,71 @@ static bool WantsToCloseMenu()
 
 void DrawSettingsWindow()
 {
-  BeginFullscreenColumns();
+  ImGuiIO& io = ImGui::GetIO();
+  ImVec2 heading_size = ImVec2(
+    io.DisplaySize.x, LayoutScale(LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY + LAYOUT_MENU_BUTTON_Y_PADDING * 2.0f + 2.0f));
 
-  if (BeginFullscreenColumnWindow(0.0f, 300.0f, "settings_category", ImVec4(0.18f, 0.18f, 0.18f, 1.00f)))
+  if (BeginFullscreenWindow(ImVec2(0.0f, ImGuiFullscreen::g_menu_bar_size), heading_size, "settings_category",
+                            ImVec4(0.18f, 0.18f, 0.18f, 1.00f)))
   {
-    static constexpr std::array<const char*, static_cast<u32>(SettingsPage::Count)> titles = {
-      {ICON_FA_WINDOW_MAXIMIZE "  Interface Settings", ICON_FA_LIST "  Game List Settings",
-       ICON_FA_HDD "  Console Settings", ICON_FA_SLIDERS_H "  Emulation Settings", ICON_FA_MICROCHIP "  BIOS Settings",
-       ICON_FA_GAMEPAD "  Controller Settings", ICON_FA_KEYBOARD "  Hotkey Settings",
-       ICON_FA_SD_CARD "  Memory Card Settings", ICON_FA_TV "  Display Settings",
-       ICON_FA_MAGIC "  Enhancement Settings", ICON_FA_HEADPHONES "  Audio Settings",
-       ICON_FA_TROPHY "  Achievements Settings", ICON_FA_EXCLAMATION_TRIANGLE "  Advanced Settings"}};
+    static constexpr float ITEM_WIDTH = 22.0f;
 
-    BeginMenuButtons();
-    for (u32 i = 0; i < static_cast<u32>(titles.size()); i++)
+    static constexpr std::array<const char*, static_cast<u32>(SettingsPage::Count)> icons = {
+      {ICON_FA_WINDOW_MAXIMIZE, ICON_FA_LIST, ICON_FA_HDD, ICON_FA_SLIDERS_H, ICON_FA_MICROCHIP, ICON_FA_GAMEPAD,
+       ICON_FA_KEYBOARD, ICON_FA_SD_CARD, ICON_FA_TV, ICON_FA_MAGIC, ICON_FA_HEADPHONES, ICON_FA_TROPHY,
+       ICON_FA_EXCLAMATION_TRIANGLE}};
+
+    static constexpr std::array<const char*, static_cast<u32>(SettingsPage::Count)> titles = {
+      {"Interface Settings", "Game List Settings", "Console Settings", "Emulation Settings", "BIOS Settings",
+       "Controller Settings", "Hotkey Settings", "Memory Card Settings", "Display Settings", "Audio Settings",
+       "Enhancement Settings", "Achievements Settings", "Advanced Settings"}};
+
+    BeginNavBar();
+
+    if (ImGui::IsNavInputTest(ImGuiNavInput_FocusPrev, ImGuiInputReadMode_Pressed))
     {
-      if (ActiveButton(titles[i], s_settings_page == static_cast<SettingsPage>(i)))
-        s_settings_page = static_cast<SettingsPage>(i);
+      s_settings_page = static_cast<SettingsPage>((s_settings_page == static_cast<SettingsPage>(0)) ?
+                                                    (static_cast<u32>(SettingsPage::Count) - 1) :
+                                                    (static_cast<u32>(s_settings_page) - 1));
+    }
+    else if (ImGui::IsNavInputTest(ImGuiNavInput_FocusNext, ImGuiInputReadMode_Pressed))
+    {
+      s_settings_page =
+        static_cast<SettingsPage>((static_cast<u32>(s_settings_page) + 1) % static_cast<u32>(SettingsPage::Count));
     }
 
-    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - LayoutScale(50.0f));
-    if (ActiveButton(ICON_FA_BACKWARD "  Back", false) || WantsToCloseMenu())
+    if (NavButton(ICON_FA_BACKWARD, false, true))
       ReturnToMainWindow();
 
-    EndMenuButtons();
+    NavTitle(titles[static_cast<u32>(s_settings_page)]);
+
+    RightAlignNavButtons(static_cast<u32>(titles.size()), ITEM_WIDTH, LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY);
+
+    for (u32 i = 0; i < static_cast<u32>(titles.size()); i++)
+    {
+      if (NavButton(icons[i], s_settings_page == static_cast<SettingsPage>(i), true, ITEM_WIDTH,
+                    LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY))
+      {
+        s_settings_page = static_cast<SettingsPage>(i);
+      }
+    }
+
+    EndNavBar();
   }
 
-  EndFullscreenColumnWindow();
+  EndFullscreenWindow();
 
-  if (BeginFullscreenColumnWindow(300.0f, LAYOUT_SCREEN_WIDTH, "settings_parent"))
+  if (BeginFullscreenWindow(
+        ImVec2(0.0f, ImGuiFullscreen::g_menu_bar_size + heading_size.y),
+        ImVec2(io.DisplaySize.x, io.DisplaySize.y - heading_size.y - ImGuiFullscreen::g_menu_bar_size),
+        "settings_parent"))
   {
+    if (ImGui::IsNavInputTest(ImGuiNavInput_Cancel, ImGuiInputReadMode_Pressed))
+    {
+      if (ImGui::IsWindowFocused())
+        ReturnToMainWindow();
+    }
+
     bool settings_changed = false;
 
     switch (s_settings_page)
@@ -1611,12 +1665,6 @@ void DrawSettingsWindow()
 
 #undef MAKE_EMULATION_SPEED
 
-        settings_changed |= ToggleButton("Sync To Host Refresh Rate",
-                                         "Adjusts the emulation speed so the console's refresh rate matches the host "
-                                         "when VSync and Audio Resampling are enabled.",
-                                         &s_settings_copy.sync_to_host_refresh_rate,
-                                         s_settings_copy.video_sync_enabled && s_settings_copy.audio_resampling);
-
         MenuHeading("Runahead/Rewind");
 
         settings_changed |=
@@ -1855,7 +1903,9 @@ void DrawSettingsWindow()
           for (const auto& it : axis_cache[port])
           {
             key.Format("Axis%s", std::get<0>(it).c_str());
-            DrawInputBindingButton(InputBindingType::Axis, section, key, std::get<0>(it).c_str());
+            DrawInputBindingButton(std::get<2>(it) == Controller::AxisType::Half ? InputBindingType::HalfAxis :
+                                                                                   InputBindingType::Axis,
+                                   section, key, std::get<0>(it).c_str());
           }
 
           if (Controller::GetVibrationMotorCount(ctype) > 0)
@@ -1869,9 +1919,10 @@ void DrawSettingsWindow()
           {
             const u32 cache_index = port * CommonHostInterface::NUM_CONTROLLER_AUTOFIRE_BUTTONS + autofire_index;
 
-            if (MenuButtonWithValue(TinyString::FromFormat("Auto Fire %u", autofire_index + 1),
-                                    "Selects the button to toggle with this auto fire binding.",
-                                    autofire_buttons_cache[cache_index].c_str()))
+            if (MenuButtonWithValue(
+                  TinyString::FromFormat("Auto Fire %u##autofire_%u_%u", autofire_index + 1, port, autofire_index),
+                  "Selects the button to toggle with this auto fire binding.",
+                  autofire_buttons_cache[cache_index].c_str()))
 
             {
               auto callback = [port, autofire_index, cache_index](s32 index, const std::string& title, bool checked) {
@@ -1915,12 +1966,15 @@ void DrawSettingsWindow()
 
             key.Format("AutoFire%u", autofire_index + 1);
             DrawInputBindingButton(InputBindingType::Button, section, key,
-                                   TinyString::FromFormat("Auto Fire %u Binding", autofire_index + 1), false);
+                                   TinyString::FromFormat("Auto Fire %u Binding##autofire_binding_%u_%u",
+                                                          autofire_index + 1, port, autofire_index),
+                                   false);
 
             key.Format("AutoFire%uFrequency", autofire_index + 1);
             int frequency = s_host_interface->GetSettingsInterface()->GetIntValue(
               section, key, CommonHostInterface::DEFAULT_AUTOFIRE_FREQUENCY);
-            settings_changed |= RangeButton(TinyString::FromFormat("Auto Fire %u Frequency", autofire_index + 1),
+            settings_changed |= RangeButton(TinyString::FromFormat("Auto Fire %u Frequency##autofire_frequency_%u_%u",
+                                                                   autofire_index + 1, port, autofire_index),
                                             "Sets the rate at which the auto fire will trigger on and off.", &frequency,
                                             1, 255, 1, "%d Frames");
           }
@@ -2054,11 +2108,9 @@ void DrawSettingsWindow()
 
         switch (s_settings_copy.gpu_renderer)
         {
-#ifdef WIN32
+#ifdef _WIN32
           case GPURenderer::HardwareD3D11:
           {
-            // TODO: FIXME
-            bool use_blit_swap_chain = false;
             settings_changed |= ToggleButtonForNonSetting(
               "Use Blit Swap Chain",
               "Uses a blit presentation model instead of flipping. This may be needed on some systems.", "Display",
@@ -2101,6 +2153,11 @@ void DrawSettingsWindow()
           ToggleButton("Enable VSync",
                        "Synchronizes presentation of the console's frames to the host. Enable for smoother animations.",
                        &s_settings_copy.video_sync_enabled);
+
+        settings_changed |= ToggleButton("Sync To Host Refresh Rate",
+                                         "Adjusts the emulation speed so the console's refresh rate matches the host "
+                                         "when VSync and Audio Resampling are enabled.",
+                                         &s_settings_copy.sync_to_host_refresh_rate, s_settings_copy.audio_resampling);
 
         settings_changed |= ToggleButton("Optimal Frame Pacing",
                                          "Ensures every frame generated is displayed for optimal pacing. Disable if "
@@ -2465,11 +2522,19 @@ void DrawSettingsWindow()
           "Use Debug GPU Device", "Enable debugging when supported by the host's renderer API. Only for developer use.",
           &s_settings_copy.gpu_use_debug_device);
 
-#ifdef WIN32
+#ifdef _WIN32
         settings_changed |=
           ToggleButton("Increase Timer Resolution", "Enables more precise frame pacing at the cost of battery life.",
                        &s_settings_copy.increase_timer_resolution);
 #endif
+
+        settings_changed |= ToggleButtonForNonSetting("Allow Booting Without SBI File",
+                                                      "Allows loading protected games without subchannel information.",
+                                                      "CDROM", "AllowBootingWithoutSBIFile", false);
+
+        settings_changed |= ToggleButtonForNonSetting("Create Save State Backups",
+                                                      "Renames existing save states when saving to a backup file.",
+                                                      "General", "CreateSaveStateBackups", false);
 
         MenuHeading("Display Settings");
         settings_changed |= ToggleButtonForNonSetting("Show Status Indicators",
@@ -2533,9 +2598,7 @@ void DrawSettingsWindow()
       s_host_interface->RunLater(SaveAndApplySettings);
   }
 
-  EndFullscreenColumnWindow();
-
-  EndFullscreenColumns();
+  EndFullscreenWindow();
 }
 
 void DrawQuickMenu(MainWindowType type)
@@ -3064,8 +3127,6 @@ void DrawGameListWindow()
 
   if (BeginFullscreenColumnWindow(0.0f, 450.0f, "game_list_info", ImVec4(0.11f, 0.15f, 0.17f, 1.00f)))
   {
-    const ImGuiWindow* window = ImGui::GetCurrentWindow();
-
     ImGui::SetCursorPos(LayoutScale(ImVec2(50.0f, 50.0f)));
     ImGui::Image(selected_entry ? GetGameListCover(selected_entry)->GetHandle() :
                                   GetTextureForGameListEntryType(GameListEntryType::Count)->GetHandle(),
@@ -4119,14 +4180,22 @@ void DrawDebugDebugMenu()
 static void DrawAchievement(const Cheevos::Achievement& cheevo)
 {
   static constexpr float alpha = 0.8f;
+  static constexpr float progress_height_unscaled = 20.0f;
+  static constexpr float progress_spacing_unscaled = 5.0f;
 
   TinyString id_str;
   id_str.Format("%u", cheevo.id);
 
+  const auto progress = Cheevos::GetAchievementProgress(cheevo);
+  const bool is_measured = progress.second != 0;
+
   ImRect bb;
   bool visible, hovered;
   bool pressed =
-    MenuButtonFrame(id_str, true, LAYOUT_MENU_BUTTON_HEIGHT, &visible, &hovered, &bb.Min, &bb.Max, 0, alpha);
+    MenuButtonFrame(id_str, true,
+                    !is_measured ? LAYOUT_MENU_BUTTON_HEIGHT :
+                                   LAYOUT_MENU_BUTTON_HEIGHT + progress_height_unscaled + progress_spacing_unscaled,
+                    &visible, &hovered, &bb.Min, &bb.Max, 0, alpha);
   if (!visible)
     return;
 
@@ -4160,6 +4229,27 @@ static void DrawAchievement(const Cheevos::Achievement& cheevo)
                              cheevo.description.c_str() + cheevo.description.size(), nullptr, ImVec2(0.0f, 0.0f),
                              &summary_bb);
     ImGui::PopFont();
+  }
+
+  if (is_measured)
+  {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float progress_height = LayoutScale(progress_height_unscaled);
+    const float progress_spacing = LayoutScale(progress_spacing_unscaled);
+    const float top = midpoint + g_medium_font->FontSize + progress_spacing;
+    const ImRect progress_bb(ImVec2(text_start_x, top), ImVec2(bb.Max.x, top + progress_height));
+    const float fraction = static_cast<float>(progress.first) / static_cast<float>(progress.second);
+    dl->AddRectFilled(progress_bb.Min, progress_bb.Max, ImGui::GetColorU32(ImGuiFullscreen::UIPrimaryDarkColor()));
+    dl->AddRectFilled(progress_bb.Min, ImVec2(progress_bb.Min.x + fraction * progress_bb.GetWidth(), progress_bb.Max.y),
+                      ImGui::GetColorU32(ImGuiFullscreen::UISecondaryColor()));
+
+    text.Format("%u / %u", progress.first, progress.second);
+    const ImVec2 text_size = ImGui::CalcTextSize(text);
+    const ImVec2 text_pos(progress_bb.Min.x + ((progress_bb.Max.x - progress_bb.Min.x) / 2.0f) - (text_size.x / 2.0f),
+                          progress_bb.Min.y + ((progress_bb.Max.y - progress_bb.Min.y) / 2.0f) - (text_size.y / 2.0f));
+    dl->AddText(g_medium_font, g_medium_font->FontSize, text_pos,
+                ImGui::GetColorU32(ImGuiFullscreen::UIPrimaryTextColor()), text.GetCharArray(),
+                text.GetCharArray() + text.GetLength());
   }
 
 #if 0
@@ -4458,6 +4548,7 @@ void DrawLeaderboardsWindow()
   const ImVec2 display_size(ImGui::GetIO().DisplaySize);
   const float padding = LayoutScale(10.0f);
   const float spacing = LayoutScale(10.0f);
+  const float spacing_small = spacing / 2.0f;
   float heading_height = LayoutScale(heading_height_unscaled);
   if (is_leaderboard_open)
   {
@@ -4504,7 +4595,6 @@ void DrawLeaderboardsWindow()
       float left = bb.Min.x + padding + image_height + spacing;
       float right = bb.Max.x - padding;
       float top = bb.Min.y + padding;
-      ImDrawList* dl = ImGui::GetWindowDrawList();
       SmallString text;
       ImVec2 text_size;
 
@@ -4545,7 +4635,7 @@ void DrawLeaderboardsWindow()
           const ImRect subtitle_bb(ImVec2(left, top), ImVec2(right, top + g_large_font->FontSize));
           text.Assign(lboard->title);
 
-          top += g_large_font->FontSize + spacing;
+          top += g_large_font->FontSize + spacing_small;
 
           ImGui::PushFont(g_large_font);
           ImGui::RenderTextClipped(subtitle_bb.Min, subtitle_bb.Max, text.GetCharArray(),
@@ -4565,7 +4655,7 @@ void DrawLeaderboardsWindow()
       }
 
       const ImRect summary_bb(ImVec2(left, top), ImVec2(right, top + g_medium_font->FontSize));
-      top += g_medium_font->FontSize + spacing;
+      top += g_medium_font->FontSize + spacing_small;
 
       ImGui::PushFont(g_medium_font);
       ImGui::RenderTextClipped(summary_bb.Min, summary_bb.Max, text.GetCharArray(),
@@ -4574,7 +4664,7 @@ void DrawLeaderboardsWindow()
       if (!IsCheevosHardcoreModeActive())
       {
         const ImRect hardcore_warning_bb(ImVec2(left, top), ImVec2(right, top + g_medium_font->FontSize));
-        top += g_medium_font->FontSize + spacing;
+        top += g_medium_font->FontSize + spacing_small;
 
         ImGui::RenderTextClipped(
           hardcore_warning_bb.Min, hardcore_warning_bb.Max,
@@ -4703,8 +4793,8 @@ bool SetControllerNavInput(FrontendCommon::ControllerNavigationButton button, bo
     io.KeysDown[io.KeyMap[imkey]] = value;                                                                             \
   }
 
-  MAP_KEY(FrontendCommon::ControllerNavigationButton::LeftShoulder, ImGuiKey_PageUp);
-  MAP_KEY(FrontendCommon::ControllerNavigationButton::RightShoulder, ImGuiKey_PageDown);
+  // MAP_KEY(FrontendCommon::ControllerNavigationButton::LeftTrigger, ImGuiKey_PageUp);
+  // MAP_KEY(FrontendCommon::ControllerNavigationButton::RightTrigger, ImGuiKey_PageDown);
 
 #undef MAP_KEY
 
@@ -4726,6 +4816,8 @@ void SetImGuiNavInputs()
   MAP_BUTTON(FrontendCommon::ControllerNavigationButton::DPadRight, ImGuiNavInput_DpadRight);
   MAP_BUTTON(FrontendCommon::ControllerNavigationButton::DPadUp, ImGuiNavInput_DpadUp);
   MAP_BUTTON(FrontendCommon::ControllerNavigationButton::DPadDown, ImGuiNavInput_DpadDown);
+  MAP_BUTTON(FrontendCommon::ControllerNavigationButton::LeftShoulder, ImGuiNavInput_FocusPrev);
+  MAP_BUTTON(FrontendCommon::ControllerNavigationButton::RightShoulder, ImGuiNavInput_FocusNext);
 
 #undef MAP_BUTTON
 }

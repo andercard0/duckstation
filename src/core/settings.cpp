@@ -650,12 +650,12 @@ const char* Settings::GetCPUFastmemModeDisplayName(CPUFastmemMode mode)
 }
 
 static constexpr auto s_gpu_renderer_names = make_array(
-#ifdef WIN32
+#ifdef _WIN32
   "D3D11",
 #endif
   "Vulkan", "OpenGL", "Software");
 static constexpr auto s_gpu_renderer_display_names = make_array(
-#ifdef WIN32
+#ifdef _WIN32
   TRANSLATABLE("GPURenderer", "Hardware (D3D11)"),
 #endif
   TRANSLATABLE("GPURenderer", "Hardware (Vulkan)"), TRANSLATABLE("GPURenderer", "Hardware (OpenGL)"),
@@ -828,24 +828,33 @@ float Settings::GetDisplayAspectRatioValue() const
   }
 }
 
-static std::array<const char*, 3> s_audio_backend_names = {{
-  "Null",
-  "Cubeb",
-#ifndef ANDROID
-  "SDL",
-#else
-  "OpenSLES",
+static const auto s_audio_backend_names = make_array("Null", "Cubeb"
+#ifdef _WIN32
+                                                     ,
+                                                     "XAudio2"
 #endif
-}};
-static std::array<const char*, 3> s_audio_backend_display_names = {{
-  TRANSLATABLE("AudioBackend", "Null (No Output)"),
-  TRANSLATABLE("AudioBackend", "Cubeb"),
 #ifndef ANDROID
-  TRANSLATABLE("AudioBackend", "SDL"),
+                                                     ,
+                                                     "SDL"
 #else
-  TRANSLATABLE("AudioBackend", "OpenSL ES"),
+                                                     ,
+                                                     "OpenSLES"
 #endif
-}};
+);
+static const auto s_audio_backend_display_names =
+  make_array(TRANSLATABLE("AudioBackend", "Null (No Output)"), TRANSLATABLE("AudioBackend", "Cubeb")
+#ifdef _WIN32
+                                                                 ,
+             TRANSLATABLE("AudioBackend", "XAudio2")
+#endif
+#ifndef ANDROID
+               ,
+             TRANSLATABLE("AudioBackend", "SDL")
+#else
+                                                                 ,
+             TRANSLATABLE("AudioBackend", "OpenSL ES")
+#endif
+  );
 
 std::optional<AudioBackend> Settings::ParseAudioBackend(const char* str)
 {
