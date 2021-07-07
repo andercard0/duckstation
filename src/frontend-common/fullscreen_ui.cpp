@@ -233,8 +233,6 @@ bool Initialize(CommonHostInterface* host_interface)
 
   if (System::IsValid())
     SystemCreated();
-  if (System::IsPaused())
-    SystemPaused(true);
 
   return true;
 }
@@ -271,11 +269,6 @@ void SystemDestroyed()
   s_current_main_window = MainWindowType::Landing;
   s_quick_menu_was_open = false;
   ClearImGuiFocus();
-}
-
-void SystemPaused(bool paused)
-{
-  //
 }
 
 static void PauseForMenuOpen()
@@ -1192,7 +1185,7 @@ static void DrawAchievementsLoginWindow()
   ImGui::SetNextWindowPos(ImGui::GetIO().DisplaySize * 0.5f, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, LayoutScale(10.0f));
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, LayoutScale(10.0f, 10.0f));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, LayoutScale(20.0f, 20.0f));
   ImGui::PushFont(g_large_font);
 
   bool is_open = true;
@@ -4481,7 +4474,6 @@ static void DrawLeaderboardEntry(const Cheevos::LeaderboardEntry& lbEntry, float
   if (!visible)
     return;
 
-  const float spacing = LayoutScale(10.0f);
   const float midpoint = bb.Min.y + g_large_font->FontSize + LayoutScale(4.0f);
   float text_start_x = bb.Min.x + LayoutScale(15.0f);
   SmallString text;
@@ -4787,6 +4779,7 @@ bool SetControllerNavInput(FrontendCommon::ControllerNavigationButton button, bo
   if (!HasActiveWindow())
     return false;
 
+#if 0
   // This is a bit hacky..
   ImGuiIO& io = ImGui::GetIO();
 
@@ -4796,10 +4789,11 @@ bool SetControllerNavInput(FrontendCommon::ControllerNavigationButton button, bo
     io.KeysDown[io.KeyMap[imkey]] = value;                                                                             \
   }
 
-  // MAP_KEY(FrontendCommon::ControllerNavigationButton::LeftTrigger, ImGuiKey_PageUp);
-  // MAP_KEY(FrontendCommon::ControllerNavigationButton::RightTrigger, ImGuiKey_PageDown);
+  MAP_KEY(FrontendCommon::ControllerNavigationButton::LeftTrigger, ImGuiKey_PageUp);
+  MAP_KEY(FrontendCommon::ControllerNavigationButton::RightTrigger, ImGuiKey_PageDown);
 
 #undef MAP_KEY
+#endif
 
   return true;
 }

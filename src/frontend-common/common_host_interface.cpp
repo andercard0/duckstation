@@ -742,7 +742,7 @@ bool CommonHostInterface::SaveUndoLoadState()
     return false;
   }
 
-  Log_InfoPrintf("Saved undo load state: % " PRIu64 " bytes", m_undo_load_state->GetSize());
+  Log_InfoPrintf("Saved undo load state: %" PRIu64 " bytes", m_undo_load_state->GetSize());
   return true;
 }
 
@@ -926,7 +926,10 @@ void CommonHostInterface::UpdateSpeedLimiterState()
 
     m_audio_stream->SetInputSampleRate(input_sample_rate);
     m_audio_stream->SetWaitForBufferFill(!m_display_all_frames);
-    m_audio_stream->SetOutputVolume(GetAudioOutputVolume());
+
+    if (g_settings.audio_fast_forward_volume != g_settings.audio_output_volume)
+      m_audio_stream->SetOutputVolume(GetAudioOutputVolume());
+
     m_audio_stream->SetSync(audio_sync_enabled);
     if (audio_sync_enabled)
       m_audio_stream->EmptyBuffers();
@@ -1051,11 +1054,6 @@ void CommonHostInterface::OnSystemCreated()
 
 void CommonHostInterface::OnSystemPaused(bool paused)
 {
-  ReportFormattedMessage("System %s.", paused ? "paused" : "resumed");
-
-  if (m_fullscreen_ui_enabled)
-    FullscreenUI::SystemPaused(paused);
-
   if (paused)
   {
     if (IsFullscreen() && !m_fullscreen_ui_enabled)
