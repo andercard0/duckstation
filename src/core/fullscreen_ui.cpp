@@ -486,12 +486,12 @@ static constexpr const std::array s_ps_button_mapping{
 };
 
 static constexpr std::array s_theme_names = {
-  FSUI_NSTR("Automatic"),  FSUI_NSTR("Dark"),       FSUI_NSTR("Light"),
-  FSUI_NSTR("AMOLED"),     FSUI_NSTR("Cobalt Sky"), FSUI_NSTR("Grey Matter"),
-  FSUI_NSTR("Pinky Pals"), FSUI_NSTR("Dark Ruby"),  FSUI_NSTR("Purple Rain")};
+  FSUI_NSTR("Automatic"),  FSUI_NSTR("Dark"),        FSUI_NSTR("Light"),       FSUI_NSTR("AMOLED"),
+  FSUI_NSTR("Cobalt Sky"), FSUI_NSTR("Grey Matter"), FSUI_NSTR("Green Giant"), FSUI_NSTR("Pinky Pals"),
+  FSUI_NSTR("Dark Ruby"),  FSUI_NSTR("Purple Rain")};
 
-static constexpr std::array s_theme_values = {"",           "Dark",      "Light",    "AMOLED",    "CobaltSky",
-                                              "GreyMatter", "PinkyPals", "DarkRuby", "PurpleRain"};
+static constexpr std::array s_theme_values = {"",           "Dark",       "Light",     "AMOLED",   "CobaltSky",
+                                              "GreyMatter", "GreenGiant", "PinkyPals", "DarkRuby", "PurpleRain"};
 
 //////////////////////////////////////////////////////////////////////////
 // State
@@ -1120,9 +1120,12 @@ void FullscreenUI::ReturnToPreviousWindow()
 void FullscreenUI::ReturnToMainWindow()
 {
   ClosePauseMenu();
-  s_state.current_main_window = GPUThread::HasGPUBackend() ?
-                                  MainWindowType::None :
-                                  (ShouldOpenToGameList() ? MainWindowType::GameList : MainWindowType::Landing);
+  if (GPUThread::HasGPUBackend())
+    s_state.current_main_window = MainWindowType::None;
+  else if (ShouldOpenToGameList())
+    SwitchToGameList();
+  else
+    s_state.current_main_window = MainWindowType::Landing;
   UpdateRunIdleState();
   FixStateIfPaused();
 }
@@ -3377,6 +3380,12 @@ void FullscreenUI::SwitchToSettings()
   PopulateGraphicsAdapterList();
   PopulatePostProcessingChain(GetEditingSettingsInterface(), PostProcessing::Config::DISPLAY_CHAIN_SECTION);
 
+  if (!IsEditingGameSettings(GetEditingSettingsInterface()))
+  {
+    auto lock = Host::GetSettingsLock();
+    PopulateGameListDirectoryCache(Host::Internal::GetBaseSettingsLayer());
+  }
+
   s_state.current_main_window = MainWindowType::Settings;
   s_state.settings_page = SettingsPage::Interface;
   s_state.settings_last_bg_alpha = GetBackgroundAlpha();
@@ -4098,6 +4107,11 @@ void FullscreenUI::DrawConsoleSettingsPage()
   DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_GLOBE, "Region"), FSUI_CSTR("Determines the emulated hardware type."),
                   "Console", "Region", Settings::DEFAULT_CONSOLE_REGION, &Settings::ParseConsoleRegionName,
                   &Settings::GetConsoleRegionName, &Settings::GetConsoleRegionDisplayName, ConsoleRegion::Count);
+  DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH, "Frame Rate"),
+                  FSUI_CSTR("Utilizes the chosen frame rate regardless of the game's setting."), "GPU",
+                  "ForceVideoTiming", Settings::DEFAULT_FORCE_VIDEO_TIMING_MODE, &Settings::ParseForceVideoTimingName,
+                  &Settings::GetForceVideoTimingName, &Settings::GetForceVideoTimingDisplayName,
+                  ForceVideoTimingMode::Count);
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MAGIC, "Safe Mode"),
                     FSUI_CSTR("Temporarily disables all enhancements, useful when testing."), "Main",
                     "DisableAllEnhancements", false);
@@ -4163,11 +4177,6 @@ void FullscreenUI::DrawConsoleSettingsPage()
     FSUI_CSTR(
       "Speeds up CD-ROM seeks by the specified factor. May improve loading speeds in some games, and break others."),
     "CDROM", "SeekSpeedup", 1, cdrom_seek_speeds, true, cdrom_read_seek_speed_values);
-
-  DrawIntRangeSetting(
-    bsi, FSUI_ICONSTR(ICON_FA_FAST_FORWARD, "Readahead Sectors"),
-    FSUI_CSTR("Reduces hitches in emulation by reading/decompressing CD data asynchronously on a worker thread."),
-    "CDROM", "ReadaheadSectors", Settings::DEFAULT_CDROM_READAHEAD_SECTORS, 0, 32, FSUI_CSTR("%d sectors"));
 
   DrawToggleSetting(
     bsi, FSUI_ICONSTR(ICON_FA_DOWNLOAD, "Preload Images to RAM"),
@@ -4973,7 +4982,7 @@ void FullscreenUI::DrawGraphicsSettingsPage()
   MenuHeading(FSUI_CSTR("Device Settings"));
 
   DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_PF_PICTURE, "GPU Renderer"),
-                  FSUI_CSTR("Chooses the backend to use for rendering the console/game visuals."), "GPU", "Renderer",
+                  FSUI_CSTR("Selects the backend to use for rendering the console/game visuals."), "GPU", "Renderer",
                   Settings::DEFAULT_GPU_RENDERER, &Settings::ParseRendererName, &Settings::GetRendererName,
                   &Settings::GetRendererDisplayName, GPURenderer::Count);
 
@@ -5025,7 +5034,6 @@ void FullscreenUI::DrawGraphicsSettingsPage()
     OpenChoiceDialog(FSUI_ICONSTR(ICON_FA_MICROCHIP, "GPU Adapter"), false, std::move(options), std::move(callback));
   }
 
-  const bool true_color_enabled = (is_hardware && GetEffectiveBoolSetting(bsi, "GPU", "TrueColor", false));
   const bool pgxp_enabled = (is_hardware && GetEffectiveBoolSetting(bsi, "GPU", "PGXPEnable", false));
   const bool texture_correction_enabled =
     (pgxp_enabled && GetEffectiveBoolSetting(bsi, "GPU", "PGXPTextureCorrection", true));
@@ -5034,10 +5042,9 @@ void FullscreenUI::DrawGraphicsSettingsPage()
 
   if (is_hardware)
   {
-    DrawIntListSetting(
-      bsi, FSUI_ICONSTR(ICON_FA_EXPAND_ALT, "Internal Resolution"),
-      FSUI_CSTR("Scales internal VRAM resolution by the specified multiplier. Some games require 1x VRAM resolution."),
-      "GPU", "ResolutionScale", 1, resolution_scales);
+    DrawIntListSetting(bsi, FSUI_ICONSTR(ICON_FA_EXPAND_ALT, "Internal Resolution"),
+                       FSUI_CSTR("Upscales the game's rendering by the specified multiplier."), "GPU",
+                       "ResolutionScale", 1, resolution_scales);
 
     DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_COMPRESS_ALT, "Downsampling"),
                     FSUI_CSTR("Downsamples the rendered image prior to displaying it. Can improve "
@@ -5066,6 +5073,13 @@ void FullscreenUI::DrawGraphicsSettingsPage()
                     FSUI_CSTR("Smooths out the blockiness of magnified textures on 2D objects."), "GPU",
                     "SpriteTextureFilter", Settings::DEFAULT_GPU_TEXTURE_FILTER, &Settings::ParseTextureFilterName,
                     &Settings::GetTextureFilterName, &Settings::GetTextureFilterDisplayName, GPUTextureFilter::Count);
+
+    DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_TINT_SLASH, "Dithering"),
+                    FSUI_CSTR("Controls how dithering is applied in the emulated GPU. True Color disables dithering "
+                              "and produces the nicest looking gradients."),
+                    "GPU", "DitheringMode", Settings::DEFAULT_GPU_DITHERING_MODE, &Settings::ParseGPUDitheringModeName,
+                    &Settings::GetGPUDitheringModeName, &Settings::GetGPUDitheringModeDisplayName,
+                    GPUDitheringMode::MaxCount);
   }
 
   DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_SHAPES, "Aspect Ratio"),
@@ -5093,19 +5107,6 @@ void FullscreenUI::DrawGraphicsSettingsPage()
     FSUI_CSTR("Determines how the emulated console's output is upscaled or downscaled to your monitor's resolution."),
     "Display", "Scaling", Settings::DEFAULT_DISPLAY_SCALING, &Settings::ParseDisplayScaling,
     &Settings::GetDisplayScalingName, &Settings::GetDisplayScalingDisplayName, DisplayScalingMode::Count);
-
-  DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH, "Force Video Timing"),
-                  FSUI_CSTR("Utilizes the chosen video timing regardless of the game's setting."), "GPU",
-                  "ForceVideoTiming", Settings::DEFAULT_FORCE_VIDEO_TIMING_MODE, &Settings::ParseForceVideoTimingName,
-                  &Settings::GetForceVideoTimingName, &Settings::GetForceVideoTimingDisplayName,
-                  ForceVideoTimingMode::Count);
-
-  if (is_hardware)
-  {
-    DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_PALETTE, "True Color Rendering"),
-                      FSUI_CSTR("Disables dithering and uses the full 8 bits per channel of color information."), "GPU",
-                      "TrueColor", true);
-  }
 
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_EXCHANGE_ALT, "Widescreen Rendering"),
                     FSUI_CSTR("Increases the field of view from 4:3 to the chosen display aspect ratio in 3D games."),
@@ -5226,16 +5227,10 @@ void FullscreenUI::DrawGraphicsSettingsPage()
                     &Settings::GetGPUWireframeModeName, &Settings::GetGPUWireframeModeDisplayName,
                     GPUWireframeMode::Count);
 
-    DrawToggleSetting(
-      bsi, FSUI_ICONSTR(ICON_FA_TINT_SLASH, "Scaled Dithering"),
-      FSUI_CSTR("Scales the dithering pattern with the internal rendering resolution, making it less noticeable. "
-                "Usually safe to enable."),
-      "GPU", "ScaledDithering", true, !true_color_enabled);
-
-    DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_FILL, "Accurate Blending"),
-                      FSUI_CSTR("Forces blending to be done in the shader at 16-bit precision, when not using true "
-                                "color. Non-trivial performance impact, and unnecessary for most games."),
-                      "GPU", "AccurateBlending", false, !true_color_enabled);
+    DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_TINT_SLASH, "Scaled Interlacing"),
+                      FSUI_CSTR("Scales line skipping in interlaced rendering to the internal resolution, making it "
+                                "less noticeable. Usually safe to enable."),
+                      "GPU", "ScaledInterlacing", true, resolution_scale > 1);
 
     const GPUTextureFilter texture_filtering =
       Settings::ParseTextureFilterName(
@@ -6222,9 +6217,24 @@ void FullscreenUI::DrawAdvancedSettingsPage()
 
   MenuHeading(FSUI_CSTR("CD-ROM Emulation"));
 
+  DrawIntRangeSetting(
+    bsi, FSUI_CSTR("Readahead Sectors"),
+    FSUI_CSTR("Reduces hitches in emulation by reading/decompressing CD data asynchronously on a worker thread."),
+    "CDROM", "ReadaheadSectors", Settings::DEFAULT_CDROM_READAHEAD_SECTORS, 0, 32, FSUI_CSTR("%d sectors"));
+
+  DrawIntRangeSetting(bsi, FSUI_CSTR("Maximum Speedup Read/Seek Cycles"),
+                      FSUI_CSTR("Sets the minimum delay for the 'Maximum' read/seek speedup level."), "CDROM",
+                      "MaxSpeedupCycles", Settings::DEFAULT_CDROM_MAX_SPEEDUP_CYCLES, 0, 1000000,
+                      FSUI_CSTR("%d cycles"));
+
   DrawToggleSetting(bsi, FSUI_CSTR("Enable Region Check"),
                     FSUI_CSTR("Simulates the region check present in original, unmodified consoles."), "CDROM",
                     "RegionCheck", false);
+
+  DrawToggleSetting(
+    bsi, FSUI_CSTR("Allow Booting Without SBI File"),
+    FSUI_CSTR("Allows booting to continue even without a required SBI file. These games will not run correctly."),
+    "CDROM", "AllowBootingWithoutSBIFile", false);
 
   EndMenuButtons();
 }
@@ -7123,7 +7133,7 @@ void FullscreenUI::DrawSaveStateSelector(bool is_loading)
           const float t = std::min(static_cast<float>(std::abs(std::sin(ImGui::GetTime() * 0.75) * 1.1)), 1.0f);
           ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetColorU32(ImGuiCol_Border, t));
 
-          ImGuiFullscreen::DrawMenuButtonFrame(bb.Min, bb.Max, col, true, 0.0f);
+          ImGuiFullscreen::DrawMenuButtonFrame(bb.Min, bb.Max, col, true);
 
           ImGui::PopStyleColor();
         }
@@ -7337,34 +7347,37 @@ void FullscreenUI::DoLoadState(std::string path)
   std::string boot_path = std::move(s_state.save_state_selector_game_path);
   CloseSaveStateSelector();
 
-  Host::RunOnCPUThread([boot_path = std::move(boot_path), path = std::move(path)]() mutable {
-    if (System::IsValid())
-    {
-      if (path.empty())
+  if (GPUThread::HasGPUBackend())
+  {
+    Host::RunOnCPUThread([boot_path = std::move(boot_path), path = std::move(path)]() mutable {
+      if (System::IsValid())
       {
-        // Loading undo state.
-        if (!System::UndoLoadState())
+        if (path.empty())
         {
-          GPUThread::RunOnThread(
-            []() { ShowToast(std::string(), TRANSLATE_STR("System", "Failed to undo load state.")); });
+          // Loading undo state.
+          if (!System::UndoLoadState())
+          {
+            GPUThread::RunOnThread(
+              []() { ShowToast(std::string(), TRANSLATE_STR("System", "Failed to undo load state.")); });
+          }
+        }
+        else
+        {
+          Error error;
+          if (!System::LoadState(path.c_str(), &error, true, false))
+          {
+            GPUThread::RunOnThread([error_desc = error.TakeDescription()]() {
+              ShowToast(std::string(), fmt::format(TRANSLATE_FS("System", "Failed to load state: {}"), error_desc));
+            });
+          }
         }
       }
-      else
-      {
-        Error error;
-        if (!System::LoadState(path.c_str(), &error, true, false))
-        {
-          GPUThread::RunOnThread([error_desc = error.TakeDescription()]() {
-            ShowToast(std::string(), fmt::format(TRANSLATE_FS("System", "Failed to load state: {}"), error_desc));
-          });
-        }
-      }
-    }
-    else
-    {
-      DoStartPath(std::move(boot_path), std::move(path));
-    }
-  });
+    });
+  }
+  else
+  {
+    DoStartPath(std::move(boot_path), std::move(path));
+  }
 }
 
 void FullscreenUI::DoSaveState(s32 slot, bool global)
@@ -7735,6 +7748,8 @@ void FullscreenUI::DrawGameList(const ImVec2& heading_size)
 
     if (selected_entry)
     {
+      const ImVec4 subtitle_text_color = DarkerColor(ImGui::GetStyle().Colors[ImGuiCol_Text]);
+
       // title
       ImGui::PushFont(UIStyle.LargeFont);
       text_width = ImGui::CalcTextSize(selected_entry->title.c_str(), nullptr, false, work_width).x;
@@ -7753,14 +7768,18 @@ void FullscreenUI::DrawGameList(const ImVec2& heading_size)
                               false, work_width)
             .x;
         ImGui::SetCursorPosX((work_width - text_width) / 2.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
         ImGui::TextWrapped("%.*s", static_cast<int>(selected_entry->dbentry->developer.size()),
                            selected_entry->dbentry->developer.data());
+        ImGui::PopStyleColor();
       }
 
       // code
       text_width = ImGui::CalcTextSize(selected_entry->serial.c_str(), nullptr, false, work_width).x;
       ImGui::SetCursorPosX((work_width - text_width) / 2.0f);
+      ImGui::PushStyleColor(ImGuiCol_Text, DarkerColor(subtitle_text_color));
       ImGui::TextWrapped("%s", selected_entry->serial.c_str());
+      ImGui::PopStyleColor();
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + LayoutScale(15.0f));
 
       // region
@@ -7770,6 +7789,7 @@ void FullscreenUI::DrawGameList(const ImVec2& heading_size)
         ImGui::SameLine();
         ImGui::Image(GetCachedTexture(selected_entry->GetLanguageIconName(), 23, 16), LayoutScale(23.0f, 16.0f));
         ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
         if (display_as_language)
         {
           ImGui::TextWrapped(" (%s, %s)", selected_entry->dbentry->GetLanguagesString().c_str(),
@@ -7779,31 +7799,48 @@ void FullscreenUI::DrawGameList(const ImVec2& heading_size)
         {
           ImGui::TextWrapped(" (%s)", Settings::GetDiscRegionName(selected_entry->region));
         }
+        ImGui::PopStyleColor();
       }
 
       // genre
-      if (selected_entry->dbentry && !selected_entry->dbentry->genre.empty())
+      if (selected_entry->dbentry)
       {
-        ImGui::Text(FSUI_CSTR("Genre: %.*s"), static_cast<int>(selected_entry->dbentry->genre.size()),
-                    selected_entry->dbentry->genre.data());
-      }
+        if (!selected_entry->dbentry->genre.empty())
+        {
+          ImGui::TextUnformatted(FSUI_CSTR("Genre: "));
+          ImGui::SameLine();
+          ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
+          ImGui::TextUnformatted(selected_entry->dbentry->genre.data(),
+                                 selected_entry->dbentry->genre.data() + selected_entry->dbentry->genre.length());
+          ImGui::PopStyleColor();
+        }
 
-      // release date
-      ImGui::Text(FSUI_CSTR("Release Date: %s"), selected_entry->GetReleaseDateString().c_str());
+        if (selected_entry->dbentry->release_date != 0)
+        {
+          ImGui::TextUnformatted(FSUI_CSTR("Release Date: "));
+          ImGui::SameLine();
+          ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
+          ImGui::TextUnformatted(selected_entry->GetReleaseDateString().c_str());
+          ImGui::PopStyleColor();
+        }
+      }
 
       // achievements
       if (selected_entry->num_achievements > 0)
       {
+        ImGui::TextUnformatted(FSUI_CSTR("Achievements: "));
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
         if (selected_entry->unlocked_achievements_hc > 0)
         {
-          ImGui::Text(FSUI_CSTR("Achievements: %u (%u) / %u"), selected_entry->unlocked_achievements,
-                      selected_entry->unlocked_achievements_hc, selected_entry->num_achievements);
+          ImGui::Text("%u (%u) / %u", selected_entry->unlocked_achievements, selected_entry->unlocked_achievements_hc,
+                      selected_entry->num_achievements);
         }
         else
         {
-          ImGui::Text(FSUI_CSTR("Achievements: %u / %u"), selected_entry->unlocked_achievements,
-                      selected_entry->num_achievements);
+          ImGui::Text("%u / %u", selected_entry->unlocked_achievements, selected_entry->num_achievements);
         }
+        ImGui::PopStyleColor();
       }
 
       // compatibility
@@ -7811,19 +7848,36 @@ void FullscreenUI::DrawGameList(const ImVec2& heading_size)
       ImGui::SameLine();
       ImGui::Image(GetCachedTexture(selected_entry->GetCompatibilityIconFileName(), 88, 16), LayoutScale(88.0f, 16.0f));
       ImGui::SameLine();
+      ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
       ImGui::Text(" (%s)", GameDatabase::GetCompatibilityRatingDisplayName(
                              (selected_entry && selected_entry->dbentry) ? selected_entry->dbentry->compatibility :
                                                                            GameDatabase::CompatibilityRating::Unknown));
+      ImGui::PopStyleColor();
 
       // play time
-      ImGui::Text(FSUI_CSTR("Time Played: %s"), GameList::FormatTimespan(selected_entry->total_played_time).c_str());
-      ImGui::Text(FSUI_CSTR("Last Played: %s"), GameList::FormatTimestamp(selected_entry->last_played_time).c_str());
+      ImGui::TextUnformatted(FSUI_CSTR("Time Played: "));
+      ImGui::SameLine();
+      ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
+      ImGui::TextUnformatted(GameList::FormatTimespan(selected_entry->total_played_time).c_str());
+      ImGui::PopStyleColor();
+      ImGui::TextUnformatted(FSUI_CSTR("Last Played: "));
+      ImGui::SameLine();
+      ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
+      ImGui::TextUnformatted(GameList::FormatTimestamp(selected_entry->last_played_time).c_str());
+      ImGui::PopStyleColor();
 
       // size
       if (selected_entry->file_size >= 0)
       {
-        ImGui::Text(FSUI_CSTR("File Size: %u MB (%u MB on disk)"), to_mb(selected_entry->file_size),
-                    to_mb(selected_entry->uncompressed_size));
+        ImGui::TextUnformatted(FSUI_CSTR("File Size: "));
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, subtitle_text_color);
+        ImGui::Text(FSUI_CSTR("%u MB"), to_mb(selected_entry->file_size));
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, DarkerColor(subtitle_text_color));
+        ImGui::Text(FSUI_CSTR(" (%u MB on disk)"), to_mb(selected_entry->uncompressed_size));
+        ImGui::PopStyleColor();
       }
       else
       {
@@ -7915,7 +7969,7 @@ void FullscreenUI::DrawGameGrid(const ImVec2& heading_size)
         const float t = static_cast<float>(std::min(std::abs(std::sin(ImGui::GetTime() * 0.75) * 1.1), 1.0));
         ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetColorU32(ImGuiCol_Border, t));
 
-        ImGuiFullscreen::DrawMenuButtonFrame(bb.Min, bb.Max, col, true, 0.0f);
+        ImGuiFullscreen::DrawMenuButtonFrame(bb.Min, bb.Max, col, true);
 
         ImGui::PopStyleColor();
       }
@@ -8272,10 +8326,6 @@ void FullscreenUI::SwitchToGameList()
   }
   s_state.icon_image_map.clear();
 
-  {
-    auto lock = Host::GetSettingsLock();
-    PopulateGameListDirectoryCache(Host::Internal::GetBaseSettingsLayer());
-  }
   QueueResetFocus(FocusResetType::ViewChanged);
 }
 
@@ -8745,11 +8795,14 @@ void FullscreenUI::CloseLoadingScreen()
 
 #if 0
 // TRANSLATION-STRING-AREA-BEGIN
+TRANSLATE_NOOP("FullscreenUI", " (%u MB on disk)");
 TRANSLATE_NOOP("FullscreenUI", "%.1f ms");
 TRANSLATE_NOOP("FullscreenUI", "%.2f Seconds");
 TRANSLATE_NOOP("FullscreenUI", "%d Frames");
+TRANSLATE_NOOP("FullscreenUI", "%d cycles");
 TRANSLATE_NOOP("FullscreenUI", "%d ms");
 TRANSLATE_NOOP("FullscreenUI", "%d sectors");
+TRANSLATE_NOOP("FullscreenUI", "%u MB");
 TRANSLATE_NOOP("FullscreenUI", "-");
 TRANSLATE_NOOP("FullscreenUI", "1 Frame");
 TRANSLATE_NOOP("FullscreenUI", "10 Frames");
@@ -8820,14 +8873,12 @@ TRANSLATE_NOOP("FullscreenUI", "AMOLED");
 TRANSLATE_NOOP("FullscreenUI", "About");
 TRANSLATE_NOOP("FullscreenUI", "About DuckStation");
 TRANSLATE_NOOP("FullscreenUI", "Account");
-TRANSLATE_NOOP("FullscreenUI", "Accurate Blending");
 TRANSLATE_NOOP("FullscreenUI", "Achievement Notifications");
 TRANSLATE_NOOP("FullscreenUI", "Achievement Unlock/Count");
 TRANSLATE_NOOP("FullscreenUI", "Achievements");
 TRANSLATE_NOOP("FullscreenUI", "Achievements Settings");
 TRANSLATE_NOOP("FullscreenUI", "Achievements are not enabled.");
-TRANSLATE_NOOP("FullscreenUI", "Achievements: %u (%u) / %u");
-TRANSLATE_NOOP("FullscreenUI", "Achievements: %u / %u");
+TRANSLATE_NOOP("FullscreenUI", "Achievements: ");
 TRANSLATE_NOOP("FullscreenUI", "Add Search Directory");
 TRANSLATE_NOOP("FullscreenUI", "Add Shader");
 TRANSLATE_NOOP("FullscreenUI", "Adds a new directory to the game search list.");
@@ -8838,6 +8889,7 @@ TRANSLATE_NOOP("FullscreenUI", "Advanced");
 TRANSLATE_NOOP("FullscreenUI", "Advanced Settings");
 TRANSLATE_NOOP("FullscreenUI", "All Time: {}");
 TRANSLATE_NOOP("FullscreenUI", "Allow Booting Without SBI File");
+TRANSLATE_NOOP("FullscreenUI", "Allows booting to continue even without a required SBI file. These games will not run correctly.");
 TRANSLATE_NOOP("FullscreenUI", "Allows loading protected games without subchannel information.");
 TRANSLATE_NOOP("FullscreenUI", "Alpha Blending");
 TRANSLATE_NOOP("FullscreenUI", "Always Track Uploads");
@@ -8893,7 +8945,6 @@ TRANSLATE_NOOP("FullscreenUI", "Change View");
 TRANSLATE_NOOP("FullscreenUI", "Changes settings for the application.");
 TRANSLATE_NOOP("FullscreenUI", "Changes the aspect ratio used to display the console's output to the screen.");
 TRANSLATE_NOOP("FullscreenUI", "Cheats");
-TRANSLATE_NOOP("FullscreenUI", "Chooses the backend to use for rendering the console/game visuals.");
 TRANSLATE_NOOP("FullscreenUI", "Chooses the language used for UI elements.");
 TRANSLATE_NOOP("FullscreenUI", "Clean Boot");
 TRANSLATE_NOOP("FullscreenUI", "Clear Mappings");
@@ -8923,6 +8974,7 @@ TRANSLATE_NOOP("FullscreenUI", "Controller preset '{}' loaded.");
 TRANSLATE_NOOP("FullscreenUI", "Controller preset '{}' saved.");
 TRANSLATE_NOOP("FullscreenUI", "Controller settings reset to default.");
 TRANSLATE_NOOP("FullscreenUI", "Controls");
+TRANSLATE_NOOP("FullscreenUI", "Controls how dithering is applied in the emulated GPU. True Color disables dithering and produces the nicest looking gradients.");
 TRANSLATE_NOOP("FullscreenUI", "Controls the volume of the audio played on the host when fast forwarding.");
 TRANSLATE_NOOP("FullscreenUI", "Controls the volume of the audio played on the host.");
 TRANSLATE_NOOP("FullscreenUI", "Copies the current global settings to this game.");
@@ -8983,13 +9035,13 @@ TRANSLATE_NOOP("FullscreenUI", "Disable Mailbox Presentation");
 TRANSLATE_NOOP("FullscreenUI", "Disable Subdirectory Scanning");
 TRANSLATE_NOOP("FullscreenUI", "Disable on 2D Polygons");
 TRANSLATE_NOOP("FullscreenUI", "Disabled");
-TRANSLATE_NOOP("FullscreenUI", "Disables dithering and uses the full 8 bits per channel of color information.");
 TRANSLATE_NOOP("FullscreenUI", "Disc {} | {}");
 TRANSLATE_NOOP("FullscreenUI", "Discord Server");
 TRANSLATE_NOOP("FullscreenUI", "Display Area");
 TRANSLATE_NOOP("FullscreenUI", "Displays DualShock/DualSense button icons in the footer and input binding, instead of Xbox buttons.");
 TRANSLATE_NOOP("FullscreenUI", "Displays popup messages on events such as achievement unlocks and leaderboard submissions.");
 TRANSLATE_NOOP("FullscreenUI", "Displays popup messages when starting, submitting, or failing a leaderboard challenge.");
+TRANSLATE_NOOP("FullscreenUI", "Dithering");
 TRANSLATE_NOOP("FullscreenUI", "Double-Click Toggles Fullscreen");
 TRANSLATE_NOOP("FullscreenUI", "Download Covers");
 TRANSLATE_NOOP("FullscreenUI", "Downloads covers from a user-specified URL template.");
@@ -9066,15 +9118,14 @@ TRANSLATE_NOOP("FullscreenUI", "Fast Forward Volume");
 TRANSLATE_NOOP("FullscreenUI", "Fast forwards through memory card access, both loading and saving. Can reduce waiting times in games that frequently access memory cards.");
 TRANSLATE_NOOP("FullscreenUI", "Fast forwards through the early loading process when fast booting, saving time. Results may vary between games.");
 TRANSLATE_NOOP("FullscreenUI", "File Size");
-TRANSLATE_NOOP("FullscreenUI", "File Size: %u MB (%u MB on disk)");
+TRANSLATE_NOOP("FullscreenUI", "File Size: ");
 TRANSLATE_NOOP("FullscreenUI", "File Title");
 TRANSLATE_NOOP("FullscreenUI", "Force 4:3 For FMVs");
-TRANSLATE_NOOP("FullscreenUI", "Force Video Timing");
 TRANSLATE_NOOP("FullscreenUI", "Forces a full rescan of all games previously identified.");
-TRANSLATE_NOOP("FullscreenUI", "Forces blending to be done in the shader at 16-bit precision, when not using true color. Non-trivial performance impact, and unnecessary for most games.");
 TRANSLATE_NOOP("FullscreenUI", "Forces texture upload tracking to be enabled regardless of whether it is needed.");
 TRANSLATE_NOOP("FullscreenUI", "Forces the use of FIFO over Mailbox presentation, i.e. double buffering instead of triple buffering. Usually results in worse frame pacing.");
 TRANSLATE_NOOP("FullscreenUI", "Forcibly mutes both CD-DA and XA audio from the CD-ROM. Can be used to disable background music in some games.");
+TRANSLATE_NOOP("FullscreenUI", "Frame Rate");
 TRANSLATE_NOOP("FullscreenUI", "Frame Time Buffer");
 TRANSLATE_NOOP("FullscreenUI", "Frequency");
 TRANSLATE_NOOP("FullscreenUI", "From File...");
@@ -9099,12 +9150,13 @@ TRANSLATE_NOOP("FullscreenUI", "Game settings initialized with global settings f
 TRANSLATE_NOOP("FullscreenUI", "Game title copied to clipboard.");
 TRANSLATE_NOOP("FullscreenUI", "Game type copied to clipboard.");
 TRANSLATE_NOOP("FullscreenUI", "Game: {} ({})");
-TRANSLATE_NOOP("FullscreenUI", "Genre: %.*s");
+TRANSLATE_NOOP("FullscreenUI", "Genre: ");
 TRANSLATE_NOOP("FullscreenUI", "Geometry Tolerance");
 TRANSLATE_NOOP("FullscreenUI", "GitHub Repository");
 TRANSLATE_NOOP("FullscreenUI", "Global Slot {0} - {1}##global_slot_{0}");
 TRANSLATE_NOOP("FullscreenUI", "Global Slot {0}##global_slot_{0}");
 TRANSLATE_NOOP("FullscreenUI", "Graphics Settings");
+TRANSLATE_NOOP("FullscreenUI", "Green Giant");
 TRANSLATE_NOOP("FullscreenUI", "Grey Matter");
 TRANSLATE_NOOP("FullscreenUI", "Hardcore Mode");
 TRANSLATE_NOOP("FullscreenUI", "Hardcore mode will be enabled on next game restart.");
@@ -9127,7 +9179,7 @@ TRANSLATE_NOOP("FullscreenUI", "Internal Resolution");
 TRANSLATE_NOOP("FullscreenUI", "Language");
 TRANSLATE_NOOP("FullscreenUI", "Language: ");
 TRANSLATE_NOOP("FullscreenUI", "Last Played");
-TRANSLATE_NOOP("FullscreenUI", "Last Played: %s");
+TRANSLATE_NOOP("FullscreenUI", "Last Played: ");
 TRANSLATE_NOOP("FullscreenUI", "Latency Control");
 TRANSLATE_NOOP("FullscreenUI", "Launch Options");
 TRANSLATE_NOOP("FullscreenUI", "Launch a game by selecting a file/disc image.");
@@ -9168,6 +9220,7 @@ TRANSLATE_NOOP("FullscreenUI", "Logs out of RetroAchievements.");
 TRANSLATE_NOOP("FullscreenUI", "Macro Button {}");
 TRANSLATE_NOOP("FullscreenUI", "Makes games run closer to their console framerate, at a small cost to performance.");
 TRANSLATE_NOOP("FullscreenUI", "Maximum");
+TRANSLATE_NOOP("FullscreenUI", "Maximum Speedup Read/Seek Cycles");
 TRANSLATE_NOOP("FullscreenUI", "Memory Card Busy");
 TRANSLATE_NOOP("FullscreenUI", "Memory Card Directory");
 TRANSLATE_NOOP("FullscreenUI", "Memory Card Port {}");
@@ -9264,7 +9317,7 @@ TRANSLATE_NOOP("FullscreenUI", "Reduces polygon Z-fighting through depth testing
 TRANSLATE_NOOP("FullscreenUI", "Reduces the size of save states by compressing the data before saving.");
 TRANSLATE_NOOP("FullscreenUI", "Region");
 TRANSLATE_NOOP("FullscreenUI", "Region: ");
-TRANSLATE_NOOP("FullscreenUI", "Release Date: %s");
+TRANSLATE_NOOP("FullscreenUI", "Release Date: ");
 TRANSLATE_NOOP("FullscreenUI", "Reload Shaders");
 TRANSLATE_NOOP("FullscreenUI", "Reloads the shaders from disk, applying any changes.");
 TRANSLATE_NOOP("FullscreenUI", "Remove From Chain");
@@ -9316,9 +9369,8 @@ TRANSLATE_NOOP("FullscreenUI", "Save State Compression");
 TRANSLATE_NOOP("FullscreenUI", "Save State On Shutdown");
 TRANSLATE_NOOP("FullscreenUI", "Saved {:%c}");
 TRANSLATE_NOOP("FullscreenUI", "Saves state periodically so you can rewind any mistakes while playing.");
-TRANSLATE_NOOP("FullscreenUI", "Scaled Dithering");
-TRANSLATE_NOOP("FullscreenUI", "Scales internal VRAM resolution by the specified multiplier. Some games require 1x VRAM resolution.");
-TRANSLATE_NOOP("FullscreenUI", "Scales the dithering pattern with the internal rendering resolution, making it less noticeable. Usually safe to enable.");
+TRANSLATE_NOOP("FullscreenUI", "Scaled Interlacing");
+TRANSLATE_NOOP("FullscreenUI", "Scales line skipping in interlaced rendering to the internal resolution, making it less noticeable. Usually safe to enable.");
 TRANSLATE_NOOP("FullscreenUI", "Scaling");
 TRANSLATE_NOOP("FullscreenUI", "Scan For New Games");
 TRANSLATE_NOOP("FullscreenUI", "Scanning Subdirectories");
@@ -9341,6 +9393,7 @@ TRANSLATE_NOOP("FullscreenUI", "Select State");
 TRANSLATE_NOOP("FullscreenUI", "Select from the list of preset borders, or manually specify a custom configuration.");
 TRANSLATE_NOOP("FullscreenUI", "Selected Preset");
 TRANSLATE_NOOP("FullscreenUI", "Selects the GPU to use for rendering.");
+TRANSLATE_NOOP("FullscreenUI", "Selects the backend to use for rendering the console/game visuals.");
 TRANSLATE_NOOP("FullscreenUI", "Selects the color style to be used for Big Picture UI.");
 TRANSLATE_NOOP("FullscreenUI", "Selects the percentage of the normal clock speed the emulated hardware will run at.");
 TRANSLATE_NOOP("FullscreenUI", "Selects the quality at which screenshots will be compressed.");
@@ -9355,6 +9408,7 @@ TRANSLATE_NOOP("FullscreenUI", "Set Input Binding");
 TRANSLATE_NOOP("FullscreenUI", "Sets a threshold for discarding precise values when exceeded. May help with glitches in some games.");
 TRANSLATE_NOOP("FullscreenUI", "Sets a threshold for discarding the emulated depth buffer. May help in some games.");
 TRANSLATE_NOOP("FullscreenUI", "Sets the fast forward speed. It is not guaranteed that this speed will be reached on all systems.");
+TRANSLATE_NOOP("FullscreenUI", "Sets the minimum delay for the 'Maximum' read/seek speedup level.");
 TRANSLATE_NOOP("FullscreenUI", "Sets the target emulation speed. It is not guaranteed that this speed will be reached on all systems.");
 TRANSLATE_NOOP("FullscreenUI", "Sets the turbo speed. It is not guaranteed that this speed will be reached on all systems.");
 TRANSLATE_NOOP("FullscreenUI", "Sets the verbosity of messages logged. Higher levels will log more messages.");
@@ -9443,7 +9497,7 @@ TRANSLATE_NOOP("FullscreenUI", "This game has no achievements.");
 TRANSLATE_NOOP("FullscreenUI", "This game has no leaderboards.");
 TRANSLATE_NOOP("FullscreenUI", "Threaded Rendering");
 TRANSLATE_NOOP("FullscreenUI", "Time Played");
-TRANSLATE_NOOP("FullscreenUI", "Time Played: %s");
+TRANSLATE_NOOP("FullscreenUI", "Time Played: ");
 TRANSLATE_NOOP("FullscreenUI", "Timing out in {:.0f} seconds...");
 TRANSLATE_NOOP("FullscreenUI", "Title");
 TRANSLATE_NOOP("FullscreenUI", "Toggle Analog");
@@ -9452,7 +9506,6 @@ TRANSLATE_NOOP("FullscreenUI", "Toggle Fullscreen");
 TRANSLATE_NOOP("FullscreenUI", "Toggle every %d frames");
 TRANSLATE_NOOP("FullscreenUI", "Toggles the macro when the button is pressed, instead of held.");
 TRANSLATE_NOOP("FullscreenUI", "Trigger");
-TRANSLATE_NOOP("FullscreenUI", "True Color Rendering");
 TRANSLATE_NOOP("FullscreenUI", "Turbo Speed");
 TRANSLATE_NOOP("FullscreenUI", "Type");
 TRANSLATE_NOOP("FullscreenUI", "UI Language");
@@ -9462,6 +9515,7 @@ TRANSLATE_NOOP("FullscreenUI", "Ungrouped");
 TRANSLATE_NOOP("FullscreenUI", "Unknown");
 TRANSLATE_NOOP("FullscreenUI", "Unknown File Size");
 TRANSLATE_NOOP("FullscreenUI", "Unlimited");
+TRANSLATE_NOOP("FullscreenUI", "Upscales the game's rendering by the specified multiplier.");
 TRANSLATE_NOOP("FullscreenUI", "Use Blit Swap Chain");
 TRANSLATE_NOOP("FullscreenUI", "Use Debug GPU Device");
 TRANSLATE_NOOP("FullscreenUI", "Use DualShock/DualSense Button Icons");
@@ -9481,7 +9535,7 @@ TRANSLATE_NOOP("FullscreenUI", "Uses perspective-correct interpolation for color
 TRANSLATE_NOOP("FullscreenUI", "Uses perspective-correct interpolation for texture coordinates, straightening out warped textures.");
 TRANSLATE_NOOP("FullscreenUI", "Uses screen positions to resolve PGXP data. May improve visuals in some games.");
 TRANSLATE_NOOP("FullscreenUI", "Uses separate game settings for each disc of multi-disc games. Can only be set on the first/main disc.");
-TRANSLATE_NOOP("FullscreenUI", "Utilizes the chosen video timing regardless of the game's setting.");
+TRANSLATE_NOOP("FullscreenUI", "Utilizes the chosen frame rate regardless of the game's setting.");
 TRANSLATE_NOOP("FullscreenUI", "Value: {} | Default: {} | Minimum: {} | Maximum: {}");
 TRANSLATE_NOOP("FullscreenUI", "Vertex Cache");
 TRANSLATE_NOOP("FullscreenUI", "Vertical Sync (VSync)");

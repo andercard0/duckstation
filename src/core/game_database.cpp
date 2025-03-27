@@ -40,7 +40,7 @@ namespace GameDatabase {
 enum : u32
 {
   GAME_DATABASE_CACHE_SIGNATURE = 0x45434C48,
-  GAME_DATABASE_CACHE_VERSION = 21,
+  GAME_DATABASE_CACHE_VERSION = 24,
 };
 
 static const Entry* GetEntryForId(std::string_view code);
@@ -74,21 +74,24 @@ static constexpr const std::array<const char*, static_cast<size_t>(Compatibility
     TRANSLATE_DISAMBIG_NOOP("GameDatabase", "No Issues", "CompatibilityRating"),
   }};
 
-static constexpr const std::array<const char*, static_cast<size_t>(Trait::MaxCount)> s_trait_names = {{
+static constexpr const std::array s_trait_names = {
   "ForceInterpreter",
   "ForceSoftwareRenderer",
   "ForceSoftwareRendererForReadbacks",
   "ForceRoundTextureCoordinates",
-  "ForceAccurateBlending",
+  "ForceShaderBlending",
+  "ForceFullTrueColor",
   "ForceDeinterlacing",
   "ForceFullBoot",
   "DisableAutoAnalogMode",
   "DisableMultitap",
   "DisableTrueColor",
+  "DisableFullTrueColor",
   "DisableUpscaling",
   "DisableTextureFiltering",
   "DisableSpriteTextureFiltering",
   "DisableScaledDithering",
+  "DisableScaledInterlacing",
   "DisableWidescreen",
   "DisablePGXP",
   "DisablePGXPCulling",
@@ -101,23 +104,27 @@ static constexpr const std::array<const char*, static_cast<size_t>(Trait::MaxCou
   "ForceRecompilerICache",
   "ForceCDROMSubQSkew",
   "IsLibCryptProtected",
-}};
+};
+static_assert(s_trait_names.size() == static_cast<size_t>(Trait::MaxCount));
 
-static constexpr const std::array<const char*, static_cast<size_t>(Trait::MaxCount)> s_trait_display_names = {{
+static constexpr const std::array s_trait_display_names = {
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Interpreter", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Software Renderer", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Software Renderer For Readbacks", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Round Texture Coordinates", "GameDatabase::Trait"),
-  TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Accurate Blending", "GameDatabase::Trait"),
+  TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Shader Blending", "GameDatabase::Trait"),
+  TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Full True Color", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Deinterlacing", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Full Boot", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Automatic Analog Mode", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Multitap", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable True Color", "GameDatabase::Trait"),
+  TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Full True Color", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Upscaling", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Texture Filtering", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Sprite Texture Filtering", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Scaled Dithering", "GameDatabase::Trait"),
+  TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Scaled Interlacing", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable Widescreen", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable PGXP", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Disable PGXP Culling", "GameDatabase::Trait"),
@@ -130,13 +137,15 @@ static constexpr const std::array<const char*, static_cast<size_t>(Trait::MaxCou
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force Recompiler ICache", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Force CD-ROM SubQ Skew", "GameDatabase::Trait"),
   TRANSLATE_DISAMBIG_NOOP("GameDatabase", "Is LibCrypt Protected", "GameDatabase::Trait"),
-}};
+};
+static_assert(s_trait_display_names.size() == static_cast<size_t>(Trait::MaxCount));
 
-static constexpr std::array<const char*, static_cast<size_t>(Language::MaxCount)> s_language_names = {{
+static constexpr std::array s_language_names = {
   "Catalan", "Chinese",    "Czech",   "Danish",  "Dutch",   "English",  "Finnish", "French",
   "German",  "Greek",      "Hebrew",  "Iranian", "Italian", "Japanese", "Korean",  "Norwegian",
   "Polish",  "Portuguese", "Russian", "Spanish", "Swedish", "Turkish",
-}};
+};
+static_assert(s_language_names.size() == static_cast<size_t>(Language::MaxCount));
 
 static constexpr const char* GAMEDB_YAML_FILENAME = "gamedb.yaml";
 static constexpr const char* DISCDB_YAML_FILENAME = "discdb.yaml";
@@ -487,14 +496,6 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
     settings.gpu_force_round_texcoords = true;
   }
 
-  if (HasTrait(Trait::ForceAccurateBlending))
-  {
-    if (display_osd_messages && !settings.IsUsingSoftwareRenderer() && !settings.gpu_accurate_blending)
-      APPEND_MESSAGE(TRANSLATE_SV("GameDatabase", "Accurate blending enabled."));
-
-    settings.gpu_accurate_blending = true;
-  }
-
   if (HasTrait(Trait::ForceDeinterlacing))
   {
     const DisplayDeinterlacingMode new_mode = display_deinterlacing_mode.value_or(
@@ -525,12 +526,41 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
     }
   }
 
-  if (HasTrait(Trait::DisableTrueColor))
+  if (HasTrait(Trait::DisableTrueColor) || HasTrait(Trait::DisableFullTrueColor) ||
+      HasTrait(Trait::DisableScaledDithering) || HasTrait(Trait::ForceShaderBlending) ||
+      HasTrait(Trait::ForceFullTrueColor))
   {
-    if (display_osd_messages && settings.gpu_true_color)
-      APPEND_MESSAGE(TRANSLATE_SV("GameDatabase", "True color disabled."));
+    // Note: The order these are applied matters.
+    const GPUDitheringMode old_mode = settings.gpu_dithering_mode;
+    if (HasTrait(Trait::DisableTrueColor) && settings.IsUsingTrueColor())
+    {
+      settings.gpu_dithering_mode = GPUDitheringMode::Scaled;
+    }
+    if (HasTrait(Trait::DisableScaledDithering) && settings.IsUsingDithering())
+    {
+      settings.gpu_dithering_mode =
+        (settings.IsUsingShaderBlending() ? GPUDitheringMode::UnscaledShaderBlend : GPUDitheringMode::Unscaled);
+    }
+    if (HasTrait(Trait::ForceShaderBlending) && settings.IsUsingDithering() && !settings.IsUsingShaderBlending())
+    {
+      settings.gpu_dithering_mode = (settings.gpu_dithering_mode == GPUDitheringMode::Scaled) ?
+                                      GPUDitheringMode::ScaledShaderBlend :
+                                      GPUDitheringMode::UnscaledShaderBlend;
+    }
+    if (HasTrait(Trait::ForceFullTrueColor) && settings.gpu_dithering_mode == GPUDitheringMode::TrueColor)
+    {
+      settings.gpu_dithering_mode = GPUDitheringMode::TrueColorFull;
+    }
+    if (HasTrait(Trait::DisableFullTrueColor) && settings.gpu_dithering_mode == GPUDitheringMode::TrueColorFull)
+    {
+      settings.gpu_dithering_mode = GPUDitheringMode::TrueColor;
+    }
 
-    settings.gpu_true_color = false;
+    if (display_osd_messages && settings.gpu_dithering_mode != old_mode)
+    {
+      APPEND_MESSAGE_FMT(TRANSLATE_FS("GameDatabase", "Dithering set to {}."),
+                         Settings::GetGPUDitheringModeDisplayName(settings.gpu_dithering_mode));
+    }
   }
 
   if (HasTrait(Trait::DisableUpscaling))
@@ -563,12 +593,15 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
     settings.gpu_sprite_texture_filter = GPUTextureFilter::Nearest;
   }
 
-  if (HasTrait(Trait::DisableScaledDithering))
+  if (HasTrait(Trait::DisableScaledInterlacing))
   {
-    if (display_osd_messages && settings.gpu_scaled_dithering)
-      APPEND_MESSAGE(TRANSLATE_SV("GameDatabase", "Scaled dithering."));
+    if (display_osd_messages && settings.gpu_scaled_interlacing &&
+        settings.display_deinterlacing_mode != DisplayDeinterlacingMode::Progressive)
+    {
+      APPEND_MESSAGE(TRANSLATE_SV("GameDatabase", "Scaled interlacing disabled."));
+    }
 
-    settings.gpu_scaled_dithering = false;
+    settings.gpu_scaled_interlacing = false;
   }
 
   if (HasTrait(Trait::DisableWidescreen))
@@ -1172,6 +1205,38 @@ bool GameDatabase::ParseYamlEntry(Entry* entry, const ryml::ConstNodeRef& value)
 {
   GetStringFromObject(value, "name", &entry->title);
 
+  entry->supported_controllers = static_cast<u16>(~0u);
+
+  if (const ryml::ConstNodeRef controllers = value.find_child(to_csubstr("controllers"));
+      controllers.valid() && controllers.has_children())
+  {
+    bool first = true;
+    for (const ryml::ConstNodeRef& controller : controllers.cchildren())
+    {
+      const std::string_view controller_str = to_stringview(controller.val());
+      if (controller_str.empty())
+      {
+        WARNING_LOG("controller is not a string in {}", entry->serial);
+        return false;
+      }
+
+      const Controller::ControllerInfo* cinfo = Controller::GetControllerInfo(controller_str);
+      if (!cinfo)
+      {
+        WARNING_LOG("Invalid controller type {} in {}", controller_str, entry->serial);
+        continue;
+      }
+
+      if (first)
+      {
+        entry->supported_controllers = 0;
+        first = false;
+      }
+
+      entry->supported_controllers |= (1u << static_cast<u16>(cinfo->type));
+    }
+  }
+
   if (const ryml::ConstNodeRef metadata = value.find_child(to_csubstr("metadata")); metadata.valid())
   {
     GetStringFromObject(metadata, "genre", &entry->genre);
@@ -1214,37 +1279,19 @@ bool GameDatabase::ParseYamlEntry(Entry* entry, const ryml::ConstNodeRef& value)
         }
       }
     }
-  }
 
-  entry->supported_controllers = static_cast<u16>(~0u);
-
-  if (const ryml::ConstNodeRef controllers = value.find_child(to_csubstr("controllers"));
-      controllers.valid() && controllers.has_children())
-  {
-    bool first = true;
-    for (const ryml::ConstNodeRef& controller : controllers.cchildren())
+    if (const ryml::ConstNodeRef& multitap = metadata.find_child(to_csubstr("multitap")); multitap.valid())
     {
-      const std::string_view controller_str = to_stringview(controller.val());
-      if (controller_str.empty())
+      if (const std::optional multitap_val = StringUtil::FromChars<bool>(to_stringview(multitap.val()));
+          multitap_val.has_value())
       {
-        WARNING_LOG("controller is not a string in {}", entry->serial);
-        return false;
+        if (multitap_val.value())
+          entry->supported_controllers |= Entry::SUPPORTS_MULTITAP_BIT;
       }
-
-      const Controller::ControllerInfo* cinfo = Controller::GetControllerInfo(controller_str);
-      if (!cinfo)
+      else
       {
-        WARNING_LOG("Invalid controller type {} in {}", controller_str, entry->serial);
-        continue;
+        WARNING_LOG("Invalid multitap value in {}", entry->serial);
       }
-
-      if (first)
-      {
-        entry->supported_controllers = 0;
-        first = false;
-      }
-
-      entry->supported_controllers |= (1u << static_cast<u16>(cinfo->type));
     }
   }
 
@@ -1307,20 +1354,6 @@ bool GameDatabase::ParseYamlEntry(Entry* entry, const ryml::ConstNodeRef& value)
     else
     {
       WARNING_LOG("Invalid libcrypt value in {}", entry->serial);
-    }
-  }
-
-  if (const ryml::ConstNodeRef& multitap = value.find_child(to_csubstr("multitap")); multitap.valid())
-  {
-    if (const std::optional multitap_val = StringUtil::FromChars<bool>(to_stringview(multitap.val()));
-        multitap_val.has_value())
-    {
-      if (multitap_val.value())
-        entry->supported_controllers |= Entry::SUPPORTS_MULTITAP_BIT;
-    }
-    else
-    {
-      WARNING_LOG("Invalid multitap value in {}", entry->serial);
     }
   }
 

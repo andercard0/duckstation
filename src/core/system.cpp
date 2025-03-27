@@ -4471,12 +4471,11 @@ void System::CheckForSettingsChanges(const Settings& old_settings)
              g_settings.gpu_max_queued_frames != old_settings.gpu_max_queued_frames ||
              g_settings.gpu_use_software_renderer_for_readbacks !=
                old_settings.gpu_use_software_renderer_for_readbacks ||
-             g_settings.gpu_true_color != old_settings.gpu_true_color ||
-             g_settings.gpu_scaled_dithering != old_settings.gpu_scaled_dithering ||
+             g_settings.gpu_scaled_interlacing != old_settings.gpu_scaled_interlacing ||
              g_settings.gpu_force_round_texcoords != old_settings.gpu_force_round_texcoords ||
-             g_settings.gpu_accurate_blending != old_settings.gpu_accurate_blending ||
              g_settings.gpu_texture_filter != old_settings.gpu_texture_filter ||
              g_settings.gpu_sprite_texture_filter != old_settings.gpu_sprite_texture_filter ||
+             g_settings.gpu_dithering_mode != old_settings.gpu_dithering_mode ||
              g_settings.gpu_line_detect_mode != old_settings.gpu_line_detect_mode ||
              g_settings.gpu_downsample_mode != old_settings.gpu_downsample_mode ||
              g_settings.gpu_downsample_scale != old_settings.gpu_downsample_scale ||
@@ -4782,7 +4781,7 @@ void System::WarnAboutUnsafeSettings()
     if (g_settings.cdrom_read_speedup != 1 || g_settings.cdrom_seek_speedup != 1)
       append(ICON_EMOJI_WARNING, TRANSLATE_SV("System", "CD-ROM read/seek speedup is enabled. This may crash games."));
     if (g_settings.gpu_force_video_timing != ForceVideoTimingMode::Disabled)
-      append(ICON_FA_TV, TRANSLATE_SV("System", "Force frame timings is enabled. Games may run at incorrect speeds."));
+      append(ICON_FA_TV, TRANSLATE_SV("System", "Frame rate is not set to automatic. Games may run at incorrect speeds."));
     if (!g_settings.IsUsingSoftwareRenderer())
     {
       if (g_settings.gpu_multisamples != 1)
@@ -4846,8 +4845,8 @@ void System::WarnAboutUnsafeSettings()
       APPEND_SUBMESSAGE(TRANSLATE_SV("System", "Resolution scale set to 1x."));
     if (g_settings.gpu_multisamples != 1)
       APPEND_SUBMESSAGE(TRANSLATE_SV("System", "Multisample anti-aliasing disabled."));
-    if (g_settings.gpu_true_color)
-      APPEND_SUBMESSAGE(TRANSLATE_SV("System", "True color disabled."));
+    if (g_settings.gpu_dithering_mode != GPUDitheringMode::Unscaled)
+      APPEND_SUBMESSAGE(TRANSLATE_SV("System", "Dithering set to unscaled."));
     if (g_settings.gpu_texture_filter != GPUTextureFilter::Nearest ||
         g_settings.gpu_sprite_texture_filter != GPUTextureFilter::Nearest)
     {
